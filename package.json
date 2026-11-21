@@ -1,0 +1,10 @@
+{
+  "name": "nido",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node scripts/build-config.mjs" },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4",
+    "web-push": "3.6.7"
+  }
+}
