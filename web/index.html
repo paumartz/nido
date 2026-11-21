@@ -536,7 +536,7 @@ const DEFAULT_PROFILES = {
   fede:{ name:"Fede", char:"frog", color:"#7DB64A", face:"wink" },
 };
 const KEYS = ["pau","fede"];
-const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{}, routines:{} };
+const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{}, routines:{}, shopmeta:{} };
 const ui = { tab:"inicio", weekOf: weekStart(todayS()), loaded:false, slow:false, ai:null, aiBusy:false, aiErr:"", month:todayS().slice(0,7), letter:"", letterMonth:"", letterBusy:false, weekMode:(() => { try { return localStorage.getItem("nido-week-mode") || "quick"; } catch { return "quick"; } })(), habitView:"week", habitMonth:todayS().slice(0,7), habitYear:new Date().getFullYear(), daySheet:null };
 let DB = null, USER = null, SAMPLE = null, DL = null, DEMO = false, MY_UID = null, me = null, readOnly = false;
 
@@ -588,13 +588,16 @@ const REPEATS = { none:"No se repite", weekly:"Cada semana", biweekly:"Cada 2 se
 
 /* ============ conexión (Supabase) ============ */
 let SB = null, HH = null;
+function clean(o){ const c = { ...o }; delete c.id; return JSON.parse(JSON.stringify(c)); }
 async function put(col, id, data){
   data = { ...data, _t: Date.now() };
   (store[col] ||= {})[id] = { ...data, id };
   render();
   if (!SB || !HH) return;
-  const { error } = await SB.from("docs").upsert({ household_id:HH.id, col, id, data:clean(data), updated_at:new Date().toISOString() });
-  if (error) handleWriteErr(error);
+  try {
+    const { error } = await SB.from("docs").upsert({ household_id:HH.id, col, id, data:clean(data), updated_at:new Date().toISOString() });
+    if (error) handleWriteErr(error);
+  } catch (e){ handleWriteErr(e); }
 }
 function patch(col, id, partial){ return put(col, id, { ...((store[col]||{})[id] || {}), ...partial }); }
 async function del(col, id){
@@ -901,7 +904,8 @@ function viewShop(){
       <button class="nm" data-act="shop-toggle" data-v="${i.id}">${esc(i.name)}</button>
       ${i.addedBy ? charSVG(prof(i.addedBy)) : ""}
       <button class="x" data-act="shop-del" data-v="${i.id}" aria-label="Quitar">${ic("x",2.4)}</button></div>`;
-  return `<section class="sec"><div class="sec-h"><h2>Lista del súper</h2>${need.length ? `<button class="btn sm ghost" data-act="shop-copy">Copiar lista (${need.length})</button>` : ""}</div>
+  return `<section class="sec"><div class="sec-h"><h2>Lista del súper</h2>${need.length ? `<div class="row"><button class="btn sm ghost" data-act="shop-copy">Copiar</button>${shopMeta() ? "" : `<button class="btn sm pri" data-act="shop-close">Cerrar lista</button>`}</div>` : ""}</div>
+    ${shopTopHTML(need)}
     <form class="shop-add" data-form="shop"><input class="inp" id="shopInput" placeholder="¿Qué se está terminando? (podés pegar una lista)" autocomplete="off" maxlength="80"><button class="btn pri" type="submit">Anotar</button></form>
     ${freq.length ? `<div class="wrap-row">${freq.map(i => `<button class="chip" data-act="shop-readd" data-v="${i.id}">+ ${esc(i.name)}</button>`).join("")}</div>` : ""}
     ${need.length ? `<div class="items">${need.map(row).join("")}</div>` : `<div class="empty">No falta nada. Cuando veas que algo se termina, anotalo acá y le llega al otro.</div>`}
@@ -1055,9 +1059,8 @@ function taskSheet(id, presetDay){
       const data = { ...base, title, kind:draft.kind, assignees:draft.assignees, day:draft.day || null, time:$("#tTime").value || null, points:draft.points, repeat:$("#tRepeat").value, cal:draft.cal };
       if (id && t.status === "done" && doneBy) data.doneBy = doneBy;
       if ((draft.owner || null) !== ownerOf(title)){
-        const o = { ...ownersMap() };
-        if (draft.owner) o[okey(title)] = { title, who:draft.owner }; else delete o[okey(title)];
-        put("home", "main", { ...homeCtx(), owners:o });
+        const ow = draft.owner;
+        updateHome(h => { const o = { ...(h.owners || {}) }; if (ow) o[okey(title)] = { title, who:ow }; else delete o[okey(title)]; return { ...h, owners:o }; });
       }
       put("tasks", id || uid8(), data);
       closeSheet();
@@ -1567,8 +1570,8 @@ function famSheet(key){
     <div class="sheet-foot"><span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
     sheet.addEventListener("click", e => { if (e.target.closest("[data-close]")) closeSheet(); });
     sheet.querySelector("form").addEventListener("submit", e => { e.preventDefault();
-      const fam = { ...(homeCtx().family || {}) }; fam[key] = { bio:$("#famBio").value.trim() };
-      put("home", "main", { ...homeCtx(), family:fam }); closeSheet(); toast("Guardado"); });
+      const bio = $("#famBio").value.trim();
+      updateHome(h => ({ ...h, family:{ ...(h.family || {}), [key]:{ bio } } })); closeSheet(); toast("Guardado"); });
   });
 }
 
@@ -1695,6 +1698,7 @@ function buySheet(){
       const via = b.dataset.via; if (!via) return;
       got.forEach(i => { const bc = { ...(i.boughtCounts||{}) }; if (i.boughtBy) bc[i.boughtBy] = (bc[i.boughtBy]||0) + 1;
         put("shopping", i.id, { ...i, archived:true, got:false, boughtBy:null, boughtCounts:bc, times:(i.times||0)+1 }); });
+      if (shopMeta()) del("shopmeta", "current");
       put("tasks", uid8(), { title: via === "app" ? "Compra del súper por app" : "Compra del súper", kind:"hogar", assignees:[me], day:todayS(), time:null, points:2, repeat:"none", status:"done", doneBy:[me], doneAt:nowLocal(), via, items:got.map(i => i.name).slice(0, 40), createdAt:nowLocal(), createdBy:me });
       const apps = tasks().filter(t => t.via === "app" && (t.doneBy||[]).includes(me)).length;
       closeSheet(); burst(innerWidth/2, innerHeight/2);
@@ -1800,6 +1804,87 @@ function habitYearCard(h, y){
       return `<div class="hrow">${w === "both" ? `<span class="who">${charSVG(prof("pau"))}${charSVG(prof("fede"))}</span>` : charSVG(prof(w))}
         <div class="hy" style="--hc:${habitColor(h, w)}">${per.map((c, i) => `<div title="${MONTHS[i]}: ${c}">${c ? `<em>${c}</em>` : ""}<span class="b" style="height:${Math.round(c / max * 48)}px"></span><small>${MONTHS[i][0].toUpperCase()}</small></div>`).join("")}</div>
         <span class="hcnt tnum">${tot}</span></div>`; }).join("")}</div>`;
+}
+
+/* ============ hogar: guardado sin pisar cambios del otro ============ */
+let homeQ = Promise.resolve();
+function updateHome(fn){
+  store.home.main = { ...fn(clean(homeCtx())), id:"main", _t:Date.now() }; render();
+  if (!SB || !HH) return homeQ;
+  homeQ = homeQ.then(async () => {
+    const { data, error } = await SB.from("docs").select("data").match({ household_id:HH.id, col:"home", id:"main" }).maybeSingle();
+    if (error){ handleWriteErr(error); return; }
+    const merged = { ...fn({ ...(data?.data || {}) }), _t:Date.now() };
+    store.home.main = { ...merged, id:"main" };
+    const { error:e2 } = await SB.from("docs").upsert({ household_id:HH.id, col:"home", id:"main", data:merged, updated_at:new Date().toISOString() });
+    if (e2) handleWriteErr(e2);
+    render();
+  }).catch(() => {});
+  return homeQ;
+}
+
+/* ============ súper: cerrar lista y sugerencias ============ */
+const needItems = () => Object.values(store.shopping).filter(i => !i.archived && !i.got).sort((a,b) => (a.createdAt||"").localeCompare(b.createdAt||""));
+const shopMeta = () => store.shopmeta?.current || null;
+const daysBetween = (a, b) => Math.round((parse(b) - parse(a)) / 864e5);
+function agoText(iso){
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 60) return mins < 2 ? "recién" : `hace ${mins} min`;
+  const h = Math.round(mins / 60); if (h < 24) return `hace ${h} h`;
+  const d = Math.round(h / 24); return d === 1 ? "ayer" : `hace ${d} días`;
+}
+function getSnooze(){ try { return JSON.parse(localStorage.getItem("nido-shop-snooze") || "{}"); } catch { return {}; } }
+function setSnooze(k, until){ const s = getSnooze(); s[k] = until; try { localStorage.setItem("nido-shop-snooze", JSON.stringify(s)); } catch {} }
+function shopSuggestions(){
+  const hist = {};
+  tasks().filter(t => Array.isArray(t.items) && t.doneAt).forEach(t => t.items.forEach(n => { const k = norm(n); (hist[k] ||= { name:n, dates:[] }).dates.push(t.doneAt.slice(0,10)); }));
+  const onList = new Set(Object.values(store.shopping).filter(i => !i.archived).map(i => norm(i.name)));
+  const today = todayS(), snooze = getSnooze(), out = [];
+  for (const [k, h] of Object.entries(hist)){
+    if (onList.has(k) || (snooze[k] && snooze[k] > today)) continue;
+    const ds = [...new Set(h.dates)].sort(); if (ds.length < 2) continue;
+    const gaps = ds.slice(1).map((d, i) => daysBetween(ds[i], d)), avg = gaps.reduce((a,b) => a + b, 0) / gaps.length;
+    if (avg < 2) continue;
+    const since = daysBetween(ds[ds.length - 1], today);
+    if (since < avg * 0.85) continue;
+    out.push({ k, name:h.name, avg:Math.round(avg), since, score:since / avg });
+  }
+  return out.sort((a,b) => b.score - a.score).slice(0, 8);
+}
+function shopTopHTML(need){
+  const m = shopMeta(), sug = shopSuggestions();
+  let html = "";
+  if (m){
+    const added = need.filter(i => (i.createdAt || "") > m.closedAt).length;
+    const buyer = m.buyer === "app" ? "se pide por app" : m.buyer === me ? "comprás vos" : `compra ${esc(prof(m.buyer).name)}`;
+    html += `<div class="next-rem" style="background:color-mix(in srgb,var(--frog) 20%,var(--paper))">${charSVG(prof(m.closedBy))}<div style="flex:1;min-width:0"><b>Lista cerrada</b><div class="small muted">${esc(prof(m.closedBy).name)} la cerró ${agoText(m.closedAt)} · ${buyer}${added ? ` · se ${added === 1 ? "sumó 1 cosa" : `sumaron ${added} cosas`} después` : ""}</div></div><button class="btn sm ghost" data-act="shop-reopen">Reabrir</button></div>`;
+  }
+  if (sug.length) html += `<div class="card" style="display:flex;flex-direction:column;gap:6px"><div class="row" style="justify-content:space-between"><b>Puede que falte</b><span class="small muted">según cada cuánto lo compran</span></div>
+    ${sug.map(s => `<div class="list-row"><div class="grow"><b>${esc(s.name)}</b><div class="small muted">Lo compran cada ~${s.avg} días · la última vez fue hace ${s.since}</div></div><button class="btn sm pri" data-act="shop-sugg" data-v="${esc(s.name)}">Sumar</button><button class="x" data-act="shop-snooze" data-v="${esc(s.k)}" data-avg="${s.avg}" aria-label="Todavía hay">${ic("x",2.4)}</button></div>`).join("")}</div>`;
+  return html;
+}
+function closeListSheet(){
+  const need = needItems();
+  if (!need.length){ toast("La lista está vacía."); return; }
+  let buyer = me;
+  openSheet(`<h2>Cerrar la lista</h2>
+    <p style="margin:0">${need.length} ${need.length === 1 ? "cosa" : "cosas"} para comprar. ¿Quién hace la compra?</p>
+    <div class="wrap-row">${KEYS.map(k => `<button class="chip" data-buyer="${k}" aria-pressed="${k === me}">${charSVG(prof(k))}${esc(prof(k).name)}</button>`).join("")}<button class="chip" data-buyer="app" aria-pressed="false">Por app</button></div>
+    <p class="small muted" style="margin:0">Le avisamos a ${esc(prof(other(me)).name)} con una notificación y la lista queda copiada para pegarla donde quieras.</p>
+    <div class="sheet-foot"><button class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" data-go="1">Cerrar y avisar</button></div>`, sheet => {
+    sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.buyer){ buyer = b.dataset.buyer; sheet.querySelectorAll("[data-buyer]").forEach(x => x.setAttribute("aria-pressed", x === b)); }
+      if (b.dataset.close) closeSheet();
+      if (b.dataset.go){
+        try { navigator.clipboard.writeText(shopText()).catch(() => {}); } catch {}
+        const n = need.length, N = prof(me).name, o = other(me);
+        const msg = buyer === "app" ? `${N} cerró la lista del súper (${n} cosas). Se pide por app.` : buyer === me ? `${N} cerró la lista del súper (${n} cosas) y va a comprar.` : `${N} cerró la lista del súper (${n} cosas) y te toca comprar a vos 🛒`;
+        put("shopmeta", "current", { closedAt:nowLocal(), closedBy:me, buyer, count:n });
+        notify([o], msg);
+        closeSheet(); toast(`Lista cerrada. Le avisamos a ${prof(o).name} y la lista quedó copiada.`);
+      }
+    });
+  });
 }
 
 /* ============ súper: copiar y pegar ============ */
@@ -1930,6 +2015,10 @@ document.addEventListener("click", e => {
     case "shop-del": del("shopping", v); break;
     case "shop-readd": { const i = store.shopping[v]; put("shopping", v, { ...i, archived:false, got:false, boughtBy:null, addedBy:me, createdAt:nowLocal() }); toast(`${i.name} anotado`); break; }
     case "shop-clear": buySheet(); break;
+    case "shop-close": closeListSheet(); break;
+    case "shop-reopen": del("shopmeta", "current"); toast("Lista reabierta"); break;
+    case "shop-sugg": if (addShopItem(v)) toast(`${v} anotado`); break;
+    case "shop-snooze": setSnooze(v, addDays(todayS(), Math.max(3, Math.round((+el.dataset.avg || 6) / 2)))); render(); toast("Listo, te lo vuelvo a sugerir en unos días"); break;
     case "shop-copy": { const txt = shopText();
       try { navigator.clipboard.writeText(txt).then(() => toast("Lista copiada. Pegala donde quieras."), () => copySheet(txt)); } catch { copySheet(txt); } break; }
     case "new-rem": remSheet(); break;
@@ -1945,8 +2034,8 @@ document.addEventListener("click", e => {
     case "away-new": awaySheet(); break;
     case "away-del": del("away", v); toast("Borrado"); break;
     case "office": { const k = el.dataset.k, i = +v, cur = officeDays(k), nx = cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i].sort();
-      put("home", "main", { ...homeCtx(), office:{ ...DEFAULT_OFFICE, ...(homeCtx().office||{}), [k]:nx } }); break; }
-    case "owner-del": { const o = { ...ownersMap() }; delete o[v]; put("home", "main", { ...homeCtx(), owners:o }); toast("Ya no tiene dueño"); break; }
+      updateHome(h => ({ ...h, office:{ ...DEFAULT_OFFICE, ...(h.office || {}), [k]:nx } })); break; }
+    case "owner-del": updateHome(h => { const o = { ...(h.owners || {}) }; delete o[v]; return { ...h, owners:o }; }); toast("Ya no tiene dueño"); break;
     case "go-summary": ui.tab = "resumen"; ui.month = v; render(); window.scrollTo({ top:0 }); break;
     case "month": { const [y, mo] = ui.month.split("-").map(Number); ui.month = ymd(new Date(y, mo - 1 + (+v), 1)).slice(0,7); render(); break; }
     case "letter": writeLetter(); break;
@@ -1959,7 +2048,7 @@ document.addEventListener("click", e => {
     case "hnav": if (ui.habitView === "month"){ const [hy, hm] = ui.habitMonth.split("-").map(Number); ui.habitMonth = ymd(new Date(hy, hm - 1 + (+v), 1)).slice(0,7); } else ui.habitYear += +v; render(); break;
     case "push-on": enablePush(); break;
     case "copy": { const inp = document.getElementById(v); if (inp) copyText(inp.value, "Link copiado");
-      if (v === "inviteUrl" && !homeCtx().inviteSent) setTimeout(() => put("home", "main", { ...homeCtx(), inviteSent:true }), 1500); break; }
+      if (v === "inviteUrl" && !homeCtx().inviteSent) setTimeout(() => updateHome(h => ({ ...h, inviteSent:true })), 1500); break; }
     case "logout": if (SB) SB.auth.signOut().then(() => location.reload()); break;
     case "fam-edit": famSheet(v); break;
     case "new-habit": habitSheet(); break;
@@ -1979,12 +2068,13 @@ document.addEventListener("submit", e => {
   }
   if (f.dataset.form === "owner"){
     const title = $("#ownTitle").value.trim(), who = $("#ownWho").value; if (!title) return;
-    put("home", "main", { ...homeCtx(), owners:{ ...ownersMap(), [okey(title)]:{ title, who } } });
+    updateHome(h => ({ ...h, owners:{ ...(h.owners || {}), [okey(title)]:{ title, who } } }));
     tasks().filter(x => okey(x.title) === okey(title) && x.status !== "done").forEach(x => patch("tasks", x.id, { assignees:[who] }));
     toast(`Ahora “${title}” es de ${prof(who).name}`);
   }
   if (f.dataset.form === "ctx"){
-    put("home", "main", { ...homeCtx(), pet:$("#ctxPet").value.trim() || "Vita", about:$("#ctxAbout").value.trim() });
+    const pet = $("#ctxPet").value.trim() || "Vita", about = $("#ctxAbout").value.trim();
+    updateHome(h => ({ ...h, pet, about }));
     toast("Guardado. Las ideas ahora usan esto.");
   }
 });
@@ -2036,6 +2126,8 @@ function seedDemo(){
   mk("Desatascar la pileta", ["pau"], addDays(t,-1), 2, { status:"done", doneBy:["pau"], doneAt:nowLocal(new Date(Date.now()-864e5)), spontaneous:true,
     thanks:{ fede:{ msg:"¡Ni me había dado cuenta y ya estaba hecho! Gracias", anim:"surprise", at:nowLocal(), seen:false } } });
   store.mood[`${t}_fede`] = { id:`${t}_fede`, who:"fede", date:t, level:4 };
+  mk("Compra del súper", ["pau"], addDays(t,-20), 2, { status:"done", doneBy:["pau"], doneAt:nowLocal(new Date(Date.now()-20*864e5)), items:["Yerba","Café","Leche","Papel higiénico"] });
+  mk("Compra del súper", ["fede"], addDays(t,-11), 2, { status:"done", doneBy:["fede"], doneAt:nowLocal(new Date(Date.now()-11*864e5)), items:["Café","Leche","Papel higiénico","Arroz"] });
   store.routines.r1 = { id:"r1", title:"Sacar a Vita", who:["fede"], days:[0,1,2,3,4,5,6], slot:"manana", points:1 };
   store.routines.r2 = { id:"r2", title:"Darles de comer a las gatas", who:["pau"], days:[0,1,2,3,4,5,6], slot:"noche", points:1 };
   [["gym","Ir al gym","good","solo",3,2,2],["walk","Salir a caminar","good","together",2,2,2],["cine","Ir al cine","good","together",1,2,2],["cocina","Cocinamos en casa","good","together",0,2,1],["deli","Delivery o cheat meal","treat","together",3,2,1]]
@@ -2102,7 +2194,7 @@ async function boot(){
   try { await loadAll(); } catch { ui.slow = true; }
   resolveMe(); ui.loaded = true; render();
   subscribeLive();
-  if (TZ && !homeCtx().tz) put("home", "main", { ...homeCtx(), tz:TZ });
+  if (TZ && !homeCtx().tz) updateHome(h => h.tz ? h : ({ ...h, tz:TZ }));
   detectPush();
 }
 boot();
