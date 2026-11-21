@@ -559,7 +559,7 @@ async function del(col, id){
 }
 function handleWriteErr(e){
   if (e?.code === "42501"){ readOnly = true; toast("No tenés permiso para guardar en este nido."); }
-  else toast("No se pudo guardar. Revisá la conexión y probá de nuevo.");
+  else toast("No se pudo guardar: " + (e?.message || "revisá la conexión y probá de nuevo."));
 }
 async function loadAll(){
   const next = {}; Object.keys(store).forEach(k => { next[k] = {}; });
@@ -1816,12 +1816,19 @@ async function claim(k){
   if (DEMO){ me = k; render(); return; }
   if (!MY_UID){ toast("Entrá con tu cuenta para elegir perfil."); return; }
   me = k;
+  try { localStorage.setItem("nido-me-" + MY_UID, k); } catch {}
   await put("profiles", k, { ...prof(k), uid:MY_UID });
 }
 function resolveMe(){
   if (DEMO || !MY_UID) return;
   const k = KEYS.find(k => store.profiles[k]?.uid === MY_UID);
-  if (k) me = k;
+  if (k){ me = k; try { localStorage.setItem("nido-me-" + MY_UID, k); } catch {} return; }
+  // Respaldo: lo que eligió en este dispositivo. Si la base no lo tiene, lo vuelve a guardar.
+  let saved = null; try { saved = localStorage.getItem("nido-me-" + MY_UID); } catch {}
+  if (saved && KEYS.includes(saved) && !store.profiles[saved]?.uid){
+    me = saved;
+    if (!resolveMe.healing){ resolveMe.healing = true; put("profiles", saved, { ...prof(saved), uid:MY_UID }); }
+  }
 }
 function seedDemo(){
   const t = todayS(), ws = weekStart(t), mk = (title, as, day, pts, extra = {}) => { const id = uid8(); store.tasks[id] = { id, title, assignees:as, day, points:pts, status:"todo", repeat:"none", createdAt:nowLocal(), ...extra }; };
