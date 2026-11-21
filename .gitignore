@@ -2,3 +2,4 @@ node_modules/
 .secrets/
 supabase/migrate.sql
 .netlify/
+*.zip
