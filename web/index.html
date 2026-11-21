@@ -884,7 +884,9 @@ function viewUs(){
       <button class="btn pri" type="submit" style="align-self:flex-start">Guardar</button>
     </form>
   </section>
-  ${SB ? `<section class="sec" style="align-items:flex-start"><button class="btn sm ghost" data-act="logout">Cerrar sesión</button></section>` : ""}`;
+  ${SB ? `<section class="sec" style="align-items:flex-start">
+    ${HH ? `<details class="small" style="width:100%"><summary class="muted" style="cursor:pointer">Link de invitación</summary><div class="row" style="margin-top:8px"><input class="inp" id="inviteUrl2" readonly value="${esc(location.origin + "/?join=" + HH.invite_code)}"><button class="btn sm ghost" data-act="copy" data-v="inviteUrl2">Copiar</button></div></details>` : ""}
+    <button class="btn sm ghost" data-act="logout">Cerrar sesión</button></section>` : ""}`;
 }
 
 /* ============ sheets ============ */
@@ -1477,7 +1479,7 @@ const famBio = f => homeCtx().family?.[f.key]?.bio ?? f.bio;
 function inviteCard(always){
   if (!HH) return "";
   const pending = KEYS.some(k => !store.profiles[k]?.uid);
-  if (!pending && !always) return "";
+  if (!always && (!pending || homeCtx().inviteSent)) return "";
   const url = `${location.origin}/?join=${HH.invite_code}`;
   return `<section class="sec"><div class="card" style="display:flex;flex-direction:column;gap:10px;background:color-mix(in srgb,var(--sky) 16%,var(--paper))"><b>${pending ? `Invitar a ${esc(prof(other(me)).name)}` : "Link de invitación"}</b><span class="small muted">Mandale este link. Entra con su mail y queda en este mismo nido.</span><div class="row"><input class="inp" id="inviteUrl" readonly value="${esc(url)}"><button class="btn pri" data-act="copy" data-v="inviteUrl">Copiar</button></div></div></section>`;
 }
@@ -1771,7 +1773,8 @@ document.addEventListener("click", e => {
     case "month": { const [y, mo] = ui.month.split("-").map(Number); ui.month = ymd(new Date(y, mo - 1 + (+v), 1)).slice(0,7); render(); break; }
     case "letter": writeLetter(); break;
     case "push-on": enablePush(); break;
-    case "copy": { const inp = document.getElementById(v); if (inp) copyText(inp.value, "Link copiado"); break; }
+    case "copy": { const inp = document.getElementById(v); if (inp) copyText(inp.value, "Link copiado");
+      if (v === "inviteUrl" && !homeCtx().inviteSent) setTimeout(() => put("home", "main", { ...homeCtx(), inviteSent:true }), 1500); break; }
     case "logout": if (SB) SB.auth.signOut().then(() => location.reload()); break;
     case "fam-edit": famSheet(v); break;
     case "new-habit": habitSheet(); break;
