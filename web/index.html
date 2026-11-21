@@ -866,7 +866,7 @@ function viewReminders(){
 function viewUs(){
   const ctx = homeCtx();
   const t = todayS(), from = addDays(t, -29);
-  return `${familySection()}
+  return `${inviteCard()}${familySection()}
   <section class="sec"><div class="sec-h"><h2>Perfiles y estrellitas</h2></div>
     <div class="prof">${KEYS.map(k => { const P = prof(k), st = stickersFor(k), got = st.filter(s => s.got).length;
       return `<div class="card"><div class="head">${charSVG(P)}<div><h3>${esc(P.name)}${k===me?' <span class="pill">vos</span>':""}</h3>
@@ -1091,9 +1091,7 @@ function usExtra(){
   const t = todayS();
   const aways = Object.values(store.away).filter(a => (a.to || a.from) >= t).sort((a,b) => a.from.localeCompare(b.from));
   const owners = Object.entries(ownersMap()).sort((a,b) => a[1].title.localeCompare(b[1].title));
-  const inviteUrl = HH ? `${location.origin}/?join=${HH.invite_code}` : "";
-  const invite = HH && KEYS.some(k => !store.profiles[k]?.uid) ? `<section class="sec"><div class="card" style="display:flex;flex-direction:column;gap:10px"><b>Invitar a ${esc(prof(other(me)).name)}</b><span class="small muted">Mandale este link. Entra con su mail y queda en este mismo nido.</span><div class="row"><input class="inp" id="inviteUrl" readonly value="${esc(inviteUrl)}"><button class="btn pri" data-act="copy" data-v="inviteUrl">Copiar</button></div></div></section>` : "";
-  return `${invite}<section class="sec"><button class="month-banner" data-act="go-summary" data-v="${t.slice(0,7)}">${stickerSVG("scallop", "#EF8BB3", charSVG({ char:"star", color:"#F6C445", face:"happy" }))}<div><div class="eyebrow">Resumen mensual</div><b>Ver cómo viene su ${monthLabel(t.slice(0,7))}</b></div></button></section>
+  return `<section class="sec"><button class="month-banner" data-act="go-summary" data-v="${t.slice(0,7)}">${stickerSVG("scallop", "#EF8BB3", charSVG({ char:"star", color:"#F6C445", face:"happy" }))}<div><div class="eyebrow">Resumen mensual</div><b>Ver cómo viene su ${monthLabel(t.slice(0,7))}</b></div></button></section>
   <section class="sec"><div class="sec-h"><h2>Disponibilidad</h2><button class="btn sm pri" data-act="away-new">Avisar que no puedo</button></div>
     <p class="small muted" style="margin:0">Los días de oficina cuentan como días livianos: Nido te sugiere no cargar más de una tarea esos días.</p>
     <div class="prof">${KEYS.map(k => `<div class="card"><div class="row">${charSVG(prof(k)).replace('class="char"','class="char" style="width:36px;height:36px"')}<b>${esc(prof(k).name)}</b></div>
@@ -1476,6 +1474,13 @@ const FAMILY = [
 ];
 const famName = f => f.name || prof(f.key).name;
 const famBio = f => homeCtx().family?.[f.key]?.bio ?? f.bio;
+function inviteCard(always){
+  if (!HH) return "";
+  const pending = KEYS.some(k => !store.profiles[k]?.uid);
+  if (!pending && !always) return "";
+  const url = `${location.origin}/?join=${HH.invite_code}`;
+  return `<section class="sec"><div class="card" style="display:flex;flex-direction:column;gap:10px;background:color-mix(in srgb,var(--sky) 16%,var(--paper))"><b>${pending ? `Invitar a ${esc(prof(other(me)).name)}` : "Link de invitación"}</b><span class="small muted">Mandale este link. Entra con su mail y queda en este mismo nido.</span><div class="row"><input class="inp" id="inviteUrl" readonly value="${esc(url)}"><button class="btn pri" data-act="copy" data-v="inviteUrl">Copiar</button></div></div></section>`;
+}
 function familySection(){
   return `<section class="sec"><div class="sec-h"><h2>Quiénes somos</h2><span class="small muted">Dos humanos, una perra y tres gatas</span></div>
     <div class="fam-grid">${FAMILY.map(f => `<div class="fam-card" style="--fc:${f.c}">${famSVG(f.key)}<span class="role">${f.role}</span><h3>${esc(famName(f))}</h3><p>${esc(famBio(f))}</p><button class="edit" data-act="fam-edit" data-v="${f.key}">Editar personalidad</button></div>`).join("")}</div>
