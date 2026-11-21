@@ -1,5 +1,5 @@
 // Nido service worker: instalación, uso sin conexión básico y notificaciones.
-const CACHE = "nido-v1";
+const CACHE = "nido-v2";
 const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/config.js", "/vendor/supabase.js"];
 
 self.addEventListener("install", e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).catch(() => {})); });
