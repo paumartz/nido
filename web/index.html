@@ -1893,8 +1893,9 @@ async function boot(){
     history.replaceState(null, "", location.pathname);
     if (error) setTimeout(() => toast(error.message), 500);
   }
-  const { data:mem } = await SB.from("members").select("household_id, households(id, invite_code, cal_token)").eq("user_id", MY_UID).limit(1);
-  if (!mem?.length){ renderSetup(); return; }
+  const { data:mem, error:memErr } = await SB.from("members").select("household_id, households(id, invite_code, cal_token)").eq("user_id", MY_UID).limit(1);
+  if (memErr){ bareShell(); $("#view").innerHTML = `<div class="claim"><h1>No pude leer el nido</h1><p class="muted">La base de datos respondió: ${esc(memErr.message)}</p><p class="small muted">Revisá que hayas corrido todo supabase/schema.sql (incluidos los permisos del final).</p><button class="btn ghost" onclick="location.reload()">Reintentar</button></div>`; return; }
+  if (!mem?.length || !mem[0].households){ renderSetup(); return; }
   HH = mem[0].households;
   try { await loadAll(); } catch { ui.slow = true; }
   resolveMe(); ui.loaded = true; render();

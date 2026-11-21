@@ -90,3 +90,9 @@ alter table docs replica identity full;
 do $$ begin
   alter publication supabase_realtime add table docs;
 exception when duplicate_object then null; end $$;
+
+-- Permisos para la app (los proyectos nuevos de Supabase no los dan solos)
+grant usage on schema public to authenticated;
+grant select on households, members to authenticated;
+grant select, insert, update, delete on docs, push_subs to authenticated;
+grant execute on function is_member(uuid) to authenticated;
