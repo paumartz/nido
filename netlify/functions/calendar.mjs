@@ -14,7 +14,7 @@ export function buildIcs(rows, now = new Date()) {
   const L = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Nido//ES", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Nido", "X-WR-TIMEZONE:" + tz, "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H"];
   for (const r of rows.filter(r => r.col === "tasks")) {
     const t = r.data;
-    if (!t?.day || !/^\d{4}-\d{2}-\d{2}$/.test(t.day)) continue;
+    if (!t?.day || !/^\d{4}-\d{2}-\d{2}$/.test(t.day) || !t.cal) continue;
     const who = (t.assignees || []).map(k => names[k] || k).join(" y ");
     const title = `${t.status === "done" ? "✓ " : ""}${t.title}${who ? " · " + who : ""}`;
     const d = t.day.replace(/-/g, "");

@@ -327,6 +327,52 @@ textarea.inp{min-height:110px;resize:vertical}
 .play .mood4{animation:party .4s ease-in-out 5;transform-origin:50% 90%}
 @keyframes party{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(12deg) translateY(-8px)}}
 .mood-peek{display:inline-flex;border-radius:50%}
+/* v7: quick week, routines, habit tracker */
+.seg{display:inline-flex;background:var(--soft);border-radius:12px;padding:3px;gap:2px}
+.seg button{padding:6px 12px;border-radius:10px;font-weight:600;font-size:13px;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--paper);color:var(--ink);box-shadow:var(--shadow)}
+.qweek{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.qrow{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:16px;background:var(--paper);box-shadow:var(--shadow);min-height:48px}
+.qrow.today{box-shadow:0 0 0 2px var(--violet)}
+.qrow.over{box-shadow:0 0 0 2px var(--violet);background:color-mix(in srgb,var(--violet) 8%,var(--paper))}
+.qday{flex:none;width:44px;display:flex;flex-direction:column;align-items:center;line-height:1.1;padding:2px 0;border-radius:10px}
+.qday b{font-family:var(--f-display);font-size:16px}
+.qday span{font-size:11.5px;color:var(--ink-2)}
+.qbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.qchips{display:flex;flex-wrap:wrap;gap:5px}
+.qchip{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:4px 9px;border-radius:999px;font-size:12.5px;font-weight:600;background:color-mix(in srgb,var(--c) 22%,var(--paper));color:var(--ink);text-align:left}
+.qchip i{width:7px;height:7px;border-radius:50%;background:var(--c);flex:none}
+.qchip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qchip.done{opacity:.55;text-decoration:line-through}
+.qchip.late{box-shadow:inset 0 0 0 1.5px var(--tomato)}
+.qmeta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11.5px;color:var(--ink-2)}
+.qfree{font-size:12.5px;color:var(--ink-2);padding-top:4px}
+.qadd{flex:none;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;color:var(--ink-2)}
+.qadd:hover{background:var(--soft)}
+.qadd svg{width:16px;height:16px}
+@media (min-width:900px){
+  .qweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+  .qrow{flex-direction:column;min-height:180px}
+  .qday{flex-direction:row;gap:6px;width:auto;align-items:baseline}
+  .qchip span{white-space:normal}
+}
+.rlist .list-row .grow b{font-weight:600}
+.rcheck{width:30px;height:30px;border-radius:50%;border:2.5px solid var(--line);display:grid;place-items:center;flex:none}
+.rcheck svg{width:16px;height:16px;opacity:0}
+.rcheck[aria-pressed="true"]{background:var(--sun);border-color:var(--sun)}
+.rcheck[aria-pressed="true"] svg{opacity:1}
+.hm-grid{display:grid;grid-template-columns:repeat(7,minmax(0,24px));gap:4px;flex:1;min-width:0}
+.hm-grid i.blank{visibility:hidden}
+.hm-grid i{aspect-ratio:1;max-width:100%;border-radius:4px;background:var(--soft);display:block}
+.hm-grid i.on{background:var(--hc)}
+.hm-grid i.fut{opacity:.35}
+.hy{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;align-items:end;height:70px;flex:1;min-width:0}
+.hy div{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:2px}
+.hy span.b{width:100%;max-width:18px;border-radius:5px 5px 2px 2px;background:var(--hc);min-height:2px}
+.hy small{font-size:9.5px;color:var(--ink-2)}
+.hy em{font-style:normal;font-size:9.5px;font-weight:700;color:var(--ink-2)}
+.cal-on{display:inline-flex;align-items:center;gap:3px}
+.cal-on svg{width:12px;height:12px}
 @media (min-width:900px){.home-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:start}}
 </style>
 </head>
@@ -490,8 +536,8 @@ const DEFAULT_PROFILES = {
   fede:{ name:"Fede", char:"frog", color:"#7DB64A", face:"wink" },
 };
 const KEYS = ["pau","fede"];
-const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{} };
-const ui = { tab:"inicio", weekOf: weekStart(todayS()), loaded:false, slow:false, ai:null, aiBusy:false, aiErr:"", month:todayS().slice(0,7), letter:"", letterMonth:"", letterBusy:false };
+const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{}, routines:{} };
+const ui = { tab:"inicio", weekOf: weekStart(todayS()), loaded:false, slow:false, ai:null, aiBusy:false, aiErr:"", month:todayS().slice(0,7), letter:"", letterMonth:"", letterBusy:false, weekMode:(() => { try { return localStorage.getItem("nido-week-mode") || "quick"; } catch { return "quick"; } })(), habitView:"week", habitMonth:todayS().slice(0,7), habitYear:new Date().getFullYear(), daySheet:null };
 let DB = null, USER = null, SAMPLE = null, DL = null, DEMO = false, MY_UID = null, me = null, readOnly = false;
 
 const prof = k => ({ ...DEFAULT_PROFILES[k], ...(store.profiles[k] || {}) });
@@ -535,14 +581,15 @@ const monthLabel = m => { const [y, mo] = m.split("-").map(Number); return MONTH
 
 
 const TEMPLATES = [
-  ["Lavar toallas",2],["Lavar sábanas",2],["Lavar ropa",2],["Reponer súper",2],["Limpiar baños",3],
-  ["Sacar la basura",1],["Pasear a Vita",1],["Cocinar",2],["Lavar platos",1],["Aspirar",2],["Regar plantas",1],["Bañar a Vita",3],["Limpiar el arenero",2],["Dar de comer a las gatas",1]
+  ["Lavar las toallas",2],["Lavar las sábanas",2],["Poner un lavarropas",2],["Colgar la ropa",1],["Doblar la ropa",1],["Reponer el súper",2],["Limpiar el baño",3],
+  ["Sacar la basura",1],["Sacar a Vita",1],["Cocinar",2],["Lavar los platos",1],["Pasar la aspiradora",2],["Trapear",2],["Regar las plantas",1],["Bañar a Vita",3],["Cambiar las piedras de las gatas",2],["Darles de comer a las gatas",1],["Cambiar las sábanas",2]
 ];
 const REPEATS = { none:"No se repite", weekly:"Cada semana", biweekly:"Cada 2 semanas", monthly:"Cada mes" };
 
 /* ============ conexión (Supabase) ============ */
 let SB = null, HH = null;
 async function put(col, id, data){
+  data = { ...data, _t: Date.now() };
   (store[col] ||= {})[id] = { ...data, id };
   render();
   if (!SB || !HH) return;
@@ -566,15 +613,18 @@ async function loadAll(){
   for (let from = 0; ; from += 1000){
     const { data, error } = await SB.from("docs").select("col,id,data").eq("household_id", HH.id).range(from, from + 999);
     if (error) throw error;
-    data.forEach(r => { (next[r.col] ||= {})[r.id] = { ...r.data, id:r.id }; });
+    data.forEach(r => { const cur = store[r.col]?.[r.id]; (next[r.col] ||= {})[r.id] = cur?._t && Date.now() - cur._t < 15000 && (r.data?._t || 0) < cur._t ? cur : { ...r.data, id:r.id }; });
     if (data.length < 1000) break;
   }
+  Object.keys(store).forEach(k => Object.values(store[k]).forEach(d => { if (d._t && Date.now() - d._t < 15000 && !(next[k] ||= {})[d.id]) next[k][d.id] = d; }));
   Object.keys(next).forEach(k => { store[k] = next[k]; });
 }
 function subscribeLive(){
   SB.channel("docs-" + HH.id).on("postgres_changes", { event:"*", schema:"public", table:"docs", filter:`household_id=eq.${HH.id}` }, p => {
     if (p.eventType === "DELETE"){ const o = p.old || {}; if (o.col && store[o.col]) delete store[o.col][o.id]; }
-    else { const r = p.new; (store[r.col] ||= {})[r.id] = { ...r.data, id:r.id }; if (r.col === "profiles") resolveMe(); }
+    else { const r = p.new, cur = store[r.col]?.[r.id];
+      if (cur?._t && Date.now() - cur._t < 15000 && (r.data?._t || 0) < cur._t) return; // llegó un eco viejo de algo que acabo de cambiar
+      (store[r.col] ||= {})[r.id] = { ...r.data, id:r.id }; if (r.col === "profiles") resolveMe(); }
     render();
   }).subscribe();
   document.addEventListener("visibilitychange", () => { if (!document.hidden) loadAll().then(() => { resolveMe(); render(); }).catch(() => {}); });
@@ -713,6 +763,7 @@ function render(){
   const V = { inicio:viewHome, semana:viewWeek, super:viewShop, avisos:viewReminders, nosotros:viewUs, resumen:viewSummary, habitos:viewHabits }[ui.tab] || viewHome;
   $("#view").innerHTML = V();
   if (keep){ const el = document.getElementById(keep.id); if (el){ el.value = keep.v; el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch{} } }
+  if (ui.daySheet){ const ds = document.querySelector("#layer .daysheet"); if (ds) ds.innerHTML = dayInner(ui.daySheet); else ui.daySheet = null; }
   checkThanks();
 }
 
@@ -738,6 +789,7 @@ function taskCard(t, opts = {}){
   if (opts.showDay && t.day) meta.push(`<span>${dayLabel(t.day)}${t.day > addDays(todayS(),1) || t.day < addDays(todayS(),-1) ? " " + shortDay(t.day) : ""}</span>`);
   if (t.time) meta.push(`<span class="tnum">${t.time} hs</span>`);
   meta.push(`<span class="stars">${"★".repeat(t.points||1)}</span>`);
+  if (t.cal) meta.push(`<span class="cal-on">${ic("cal")}Calendar</span>`);
   if (own) meta.push(`<span>${CROWN} de ${esc(prof(own).name)}</span>`);
   if (t.repeat && t.repeat !== "none") meta.push(`<span>↻ ${REPEATS[t.repeat].toLowerCase()}</span>`);
   if (!as.length) meta.push(`<span>Sin asignar</span>`);
@@ -808,27 +860,35 @@ function viewWeek(){
   const ws = ui.weekOf, t = todayS(), days = weekDays(ws), we = days[6];
   const queue = tasks().filter(x => !x.day).sort(sortTasks);
   const range = `${parse(ws).getDate()} ${MONTHS[parse(ws).getMonth()].slice(0,3)} – ${parse(we).getDate()} ${MONTHS[parse(we).getMonth()].slice(0,3)}`;
+  const quick = ui.weekMode !== "detail";
   return `<div class="week-h" style="margin-top:8px">
       <button class="icon-btn" data-act="wk" data-v="-7" aria-label="Semana anterior">${ic("left")}</button>
       <button class="icon-btn" data-act="wk" data-v="7" aria-label="Semana siguiente">${ic("right")}</button>
       <h2>${ws === weekStart(t) ? "Esta semana" : ws === addDays(weekStart(t),7) ? "La semana que viene" : "Semana"} <span class="muted small" style="font-family:var(--f-body)">${range}</span></h2>
       ${ws !== weekStart(t) ? `<button class="btn sm ghost" data-act="wk" data-v="0">Hoy</button>` : ""}
-      <button class="btn sm pri" data-act="sync">${ic("cal")}Google Calendar</button>
     </div>
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-top:10px">
+      <div class="seg"><button data-act="week-mode" data-v="quick" aria-pressed="${quick}">Vista rápida</button><button data-act="week-mode" data-v="detail" aria-pressed="${!quick}">Detalle</button></div>
+      <button class="btn sm ghost" data-act="sync">${ic("cal")}Google Calendar</button>
+    </div>
+    ${quick ? `<div class="qweek">${days.map(quickRow).join("")}</div>
+      <p class="small muted" style="margin:8px 0 0">Tocá el día para ver todo, incluidas las rutinas. Tocá una tarea para cambiarla o moverla.</p>` : `
     <p class="small muted" style="margin:8px 0 0">Tocá una tarea para cambiarla o moverla. En compu podés arrastrarla a otro día o a la cola.</p>
     <div class="days">${days.map(d => {
-      const list = tasksOn(d);
+      const list = tasksOn(d).filter(x => !x.routine);
       return `<section class="day ${d===t?"today":""}" data-drop="${d}">
         <div class="day-h"><b>${d===t?"Hoy":DAYS[dow(d)]}</b><span class="d">${shortDay(d)}</span>
           <span class="load">${KEYS.map(k => `<span title="${esc(prof(k).name)}"><i style="background:${prof(k).color}"></i>${loadOf(d,k)}</span>`).join("")}</span></div>${dayTags(d)}
         ${list.length ? `<div class="tasks">${list.map(x => taskCard(x)).join("")}</div>` : ""}
         <button class="add-day" data-act="new-task" data-day="${d}">+ Agregar tarea</button>
-      </section>`;}).join("")}</div>
+        ${routinesOn(d).length ? `<button class="add-day" data-act="day-open" data-v="${d}">${routinesOn(d).length} ${routinesOn(d).length === 1 ? "rutina" : "rutinas"} ›</button>` : ""}
+      </section>`;}).join("")}</div>`}
     <section class="sec queue day" data-drop="queue" style="background:transparent">
       <div class="sec-h"><h2>En la cola</h2><span class="muted small">${queue.length} ${queue.length===1?"tarea":"tareas"} para más adelante</span></div>
       ${queue.length ? `<div class="tasks">${queue.map(x => taskCard(x)).join("")}</div>` : `<div class="empty">La cola está vacía. Cuando anotes algo sin fecha, queda acá esperando.</div>`}
       <button class="add-day" data-act="new-task" data-day="">+ Anotar para más adelante</button>
-    </section>`;
+    </section>
+    ${routinesSection()}`;
 }
 
 function viewShop(){
@@ -895,7 +955,7 @@ function openSheet(html, onMount){
   const first = $("#layer").querySelector("input,button:not([data-act=close-sheet])"); first?.focus({ preventScroll:true });
   onMount?.($("#layer .sheet"));
 }
-const closeSheet = () => { $("#layer").innerHTML = ""; };
+const closeSheet = () => { $("#layer").innerHTML = ""; ui.daySheet = null; };
 
 function dayChoices(sel){
   const t = todayS(), base = weekStart(t), opts = [];
@@ -905,13 +965,20 @@ function dayChoices(sel){
     opts.map(d => `<button type="button" class="chip" data-pick="day" data-v="${d}" aria-pressed="${sel===d}">${d===t?"Hoy":d===addDays(t,1)?"Mañana":DAYS_S[dow(d)]+" "+shortDay(d)}</button>`).join("");
 }
 
-const tplChips = kind => (kind === "gestion" ? TEMPLATES_G : TEMPLATES).map(([n,p]) => `<button type="button" class="chip" data-tpl="${esc(n)}" data-p="${p}">${esc(n)}</button>`).join("");
+const tplChips = kind => {
+  const base = kind === "gestion" ? TEMPLATES_G : TEMPLATES, cnt = {}, pts = {};
+  tasks().filter(t => (t.kind || "hogar") === kind && !t.routine && !t.via && !t.title.startsWith("Compra del súper")).forEach(t => { cnt[t.title] = (cnt[t.title] || 0) + 1; pts[t.title] = t.points || 1; });
+  const fav = Object.entries(cnt).sort((a,b) => b[1] - a[1]).slice(0, 6).map(([n]) => [n, pts[n]]), seen = new Set(fav.map(f => norm(f[0])));
+  return [...fav, ...base.filter(([n]) => !seen.has(norm(n)))].map(([n,p]) => `<button type="button" class="chip" data-tpl="${esc(n)}" data-p="${p}">${esc(n)}</button>`).join("");
+};
+const BIG_RE = /veterin|medic|turno|dentist|compra grande|compras del mes|regalo|visita|arreglo|plomer|electricist|vacuna|cumple|viaje|mudanza|service|banco/;
 function syncPressed(sheet, group, fn){ sheet.querySelectorAll(`[data-pick=${group}]`).forEach(x => x.setAttribute("aria-pressed", fn(x.dataset.v))); }
 function whoPressed(as){ return v => v === "both" ? as.length === 2 : v === "none" ? as.length === 0 : as.length === 1 && as[0] === v; }
 
 function taskSheet(id, presetDay){
   const t = id ? store.tasks[id] : { title:"", assignees:[me], day: presetDay ?? todayS(), time:"", points:1, repeat:"none", kind:"hogar" };
-  const draft = { assignees:[...(t.assignees||[])], day:t.day || "", points:t.points||1, kind:t.kind||"hogar", owner: id ? ownerOf(t.title) : null };
+  const draft = { assignees:[...(t.assignees||[])], day:t.day || "", points:t.points||1, kind:t.kind||"hogar", owner: id ? ownerOf(t.title) : null, cal: !!t.cal };
+  let calTouched = !!id;
   const tmd = todayS();
   openSheet(`<form data-form="task" style="display:contents">
     <h2>${id ? "Editar tarea" : "Nueva tarea"}</h2>
@@ -932,6 +999,7 @@ function taskSheet(id, presetDay){
     <div class="field"><span class="lbl">¿Cuánto esfuerzo? (estrellitas que da)</span><div class="wrap-row">
       ${[1,2,3].map(p => `<button type="button" class="chip" data-pick="pts" data-v="${p}" aria-pressed="${draft.points===p}"><span class="stars">${"★".repeat(p)}</span>${["Rapidito","Normal","Pesada"][p-1]}</button>`).join("")}</div></div>
     <div class="field"><label for="tRepeat">Repetir</label><select class="inp" id="tRepeat">${Object.entries(REPEATS).map(([k,v]) => `<option value="${k}" ${(t.repeat||"none")===k?"selected":""}>${v}</option>`).join("")}</select></div>
+    <div class="field"><div class="row"><button type="button" class="switch" role="switch" id="tCal" aria-checked="${draft.cal}" aria-label="Mostrar en Google Calendar"></button><span><b>En Google Calendar</b><span class="small muted" style="display:block">Para lo importante: veterinario, turnos, compras grandes.</span></span></div></div>
     <div class="field"><span class="lbl">Dueño de esta tarea</span><div class="wrap-row">
       <button type="button" class="chip" data-pick="owner" data-v="" aria-pressed="${!draft.owner}">Nadie fijo</button>
       ${KEYS.map(k => `<button type="button" class="chip" data-pick="owner" data-v="${k}" aria-pressed="${draft.owner===k}">${CROWN}${esc(prof(k).name)}</button>`).join("")}</div>
@@ -957,11 +1025,13 @@ function taskSheet(id, presetDay){
       draft.owner = o; draft.assignees = [o];
       syncPressed(sheet, "owner", v => v === o); syncPressed(sheet, "who", whoPressed(draft.assignees)); hints();
     };
+    const autoCal = () => { if (calTouched) return; draft.cal = BIG_RE.test(norm($("#tTitle").value)); sheet.querySelector("#tCal").setAttribute("aria-checked", draft.cal); };
     hints();
-    $("#tTitle").addEventListener("change", applyOwner);
+    $("#tTitle").addEventListener("change", () => { applyOwner(); autoCal(); });
     sheet.addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
-      if (b.dataset.tpl){ $("#tTitle").value = b.dataset.tpl; draft.points = +b.dataset.p; syncPressed(sheet, "pts", v => +v === draft.points); applyOwner(); return; }
+      if (b.id === "tCal"){ calTouched = true; draft.cal = !draft.cal; b.setAttribute("aria-checked", draft.cal); return; }
+      if (b.dataset.tpl){ $("#tTitle").value = b.dataset.tpl; draft.points = +b.dataset.p; syncPressed(sheet, "pts", v => +v === draft.points); applyOwner(); autoCal(); return; }
       if (b.dataset.pick){
         const g = b.dataset.pick, v = b.dataset.v;
         sheet.querySelectorAll(`[data-pick=${g}]`).forEach(x => x.setAttribute("aria-pressed", x === b));
@@ -982,7 +1052,7 @@ function taskSheet(id, presetDay){
       e.preventDefault();
       const title = $("#tTitle").value.trim(); if (!title) return;
       const base = id ? store.tasks[id] : { status:"todo", createdAt:nowLocal(), createdBy:me };
-      const data = { ...base, title, kind:draft.kind, assignees:draft.assignees, day:draft.day || null, time:$("#tTime").value || null, points:draft.points, repeat:$("#tRepeat").value };
+      const data = { ...base, title, kind:draft.kind, assignees:draft.assignees, day:draft.day || null, time:$("#tTime").value || null, points:draft.points, repeat:$("#tRepeat").value, cal:draft.cal };
       if (id && t.status === "done" && doneBy) data.doneBy = doneBy;
       if ((draft.owner || null) !== ownerOf(title)){
         const o = { ...ownersMap() };
@@ -1329,7 +1399,7 @@ function copyText(txt, ok){
 function syncSheet(){
   const url = HH ? `${location.origin}/cal/${HH.cal_token}.ics` : "";
   openSheet(`<h2>Google Calendar</h2>
-    <p style="margin:0">Suscribí tu Google Calendar a este link una sola vez y las tareas agendadas aparecen solas, también en el celu.</p>
+    <p style="margin:0">Suscribí tu Google Calendar a este link una sola vez. Aparecen solas las tareas que marques como <b>“En Google Calendar”</b> al crearlas o editarlas: lo importante, como veterinario, turnos o compras grandes.</p>
     ${url ? `<div class="row"><input class="inp" id="calUrl" readonly value="${esc(url)}"><button class="btn pri" data-copy="1">Copiar</button></div>` : `<div class="empty">Disponible en la app conectada.</div>`}
     <ol class="small" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px">
       <li>Copiá el link.</li>
@@ -1566,14 +1636,23 @@ function habitCard(h, days){
   </div>`;
 }
 function viewHabits(){
-  const ws = weekStart(todayS()), days = weekDays(ws), sc = habitScore(ws, days[6]);
-  const hs = habits(), good = hs.filter(h => h.kind !== "treat"), treats = hs.filter(h => h.kind === "treat");
+  const v = ui.habitView, hs = habits(), good = hs.filter(h => h.kind !== "treat"), treats = hs.filter(h => h.kind === "treat");
+  let from, to, label, cards;
+  if (v === "month"){ const [Y, M] = ui.habitMonth.split("-").map(Number); from = `${ui.habitMonth}-01`; to = ymd(new Date(Y, M, 0)); label = monthLabel(ui.habitMonth); cards = h => habitMonthCard(h, ui.habitMonth); }
+  else if (v === "year"){ from = `${ui.habitYear}-01-01`; to = `${ui.habitYear}-12-31`; label = String(ui.habitYear); cards = h => habitYearCard(h, ui.habitYear); }
+  else { const ws = weekStart(todayS()), days = weekDays(ws); from = ws; to = days[6]; label = "esta semana"; cards = h => habitCard(h, days); }
+  const sc = habitScore(from, to);
+  const canNext = v === "month" ? ui.habitMonth < todayS().slice(0,7) : v === "year" ? ui.habitYear < new Date().getFullYear() : false;
   return `<section class="sec"><div class="sec-h"><h2>Hábitos de a dos</h2><button class="btn sm pri" data-act="new-habit">${ic("plus")}Nuevo hábito</button></div>
-      <p class="small muted" style="margin:0">Lo que les hace bien, por separado o juntos. Cada vez suma estrellitas. Cocinar en casa suma. El delivery o cheat meal es neutro mientras sea 1 de cada 5 comidas (80/20); más que eso, resta una.</p>
-      <div class="score" style="margin-top:4px">${KEYS.map(k => `<div class="p" style="background:${shade(prof(k).color, .55)}">${charSVG(prof(k))}<div><div class="n tnum">${sc[k]}⭐</div><div class="small" style="font-weight:600">${esc(prof(k).name)} · hábitos esta semana</div></div></div>`).join("")}</div></section>
-    <section class="sec"><div class="sec-h"><h2>Hoy</h2><span class="small muted">Tocá lo que hiciste</span></div>${habitChips()}</section>
-    ${good.length ? `<section class="sec"><div class="sec-h"><h2>Para estar bien</h2></div>${good.map(h => habitCard(h, days)).join("")}</section>` : ""}
-    ${treats.length ? `<section class="sec"><div class="sec-h"><h2>Gustitos</h2></div>${treats.map(h => habitCard(h, days)).join("")}</section>` : ""}`;
+      <p class="small muted" style="margin:0">Cada semana arranca de cero en la grilla, pero todo queda guardado: en Mes y Año ven el historial. Cocinar en casa suma; el delivery o cheat meal es neutro mientras sea 1 de cada 5 comidas (80/20).</p>
+      <div class="row" style="flex-wrap:wrap;justify-content:space-between">
+        <div class="seg">${[["week","Semana"],["month","Mes"],["year","Año"]].map(([k,l]) => `<button data-act="habit-view" data-v="${k}" aria-pressed="${v===k}">${l}</button>`).join("")}</div>
+        ${v !== "week" ? `<div class="row"><button class="icon-btn" data-act="hnav" data-v="-1" aria-label="Anterior">${ic("left")}</button><b style="min-width:90px;text-align:center">${label}</b><button class="icon-btn" data-act="hnav" data-v="1" aria-label="Siguiente" ${canNext ? "" : "disabled"}>${ic("right")}</button></div>` : ""}
+      </div>
+      <div class="score" style="margin-top:4px">${KEYS.map(k => `<div class="p" style="background:${shade(prof(k).color, .55)}">${charSVG(prof(k))}<div><div class="n tnum">${sc[k]}⭐</div><div class="small" style="font-weight:600">${esc(prof(k).name)} · ${v === "week" ? "esta semana" : label}</div></div></div>`).join("")}</div></section>
+    ${v === "week" ? `<section class="sec"><div class="sec-h"><h2>Hoy</h2><span class="small muted">Tocá lo que hiciste</span></div>${habitChips()}</section>` : ""}
+    ${good.length ? `<section class="sec"><div class="sec-h"><h2>Para estar bien</h2></div>${good.map(cards).join("")}</section>` : ""}
+    ${treats.length ? `<section class="sec"><div class="sec-h"><h2>Gustitos</h2></div>${treats.map(cards).join("")}</section>` : ""}`;
 }
 function habitSheet(id){
   const h = id ? store.habits[id] : { name:"", kind:"good", mode:"solo", goal:3, budget:2, points:1 };
@@ -1622,6 +1701,105 @@ function buySheet(){
       toast(via === "app" ? `+2 ⭐. Campeonato del sillón: ${apps} ${apps===1?"compra":"compras"} sin moverte de casa` : "+2 ⭐. ¡Compra terminada!");
     });
   });
+}
+
+/* ============ semana: vista rápida, rutinas y día ============ */
+const routines = () => Object.values(store.routines || {}).sort((a,b) => (a.slot||"z").localeCompare(b.slot||"z") || (a.title||"").localeCompare(b.title||""));
+const SLOTS = { manana:"Mañana", tarde:"Tarde", noche:"Noche", "":"Cuando sea" };
+const routinesOn = d => routines().filter(r => (r.days||[]).includes(dow(d)));
+const rtId = (rid, d) => `rt_${rid}_${d}`;
+function quickRow(d){
+  const t = todayS(), list = tasksOn(d).filter(x => !x.routine), rs = routinesOn(d);
+  const rDone = rs.filter(r => store.tasks[rtId(r.id, d)]).length;
+  const tags = [];
+  for (const k of KEYS){
+    const n = esc(prof(k).name), c = prof(k).color;
+    if (awayOn(k, d)) tags.push(`<span class="tag no" style="--c:${c}">${n} no puede</span>`);
+    else if (isOffice(k, d)) tags.push(`<span class="tag" style="--c:${c}">${n} · ofi</span>`);
+  }
+  const chip = x => { const as = x.assignees || [], c = as.length === 1 ? prof(as[0]).color : as.length === 2 ? "#B58AE8" : "#C9C2D6";
+    return `<button class="qchip ${x.status === "done" ? "done" : ""} ${x.day < t && x.status !== "done" ? "late" : ""}" style="--c:${c}" data-act="edit-task" data-v="${x.id}" draggable="true" data-drag="${x.id}"><i></i><span>${esc(x.title)}${x.time ? ` · ${x.time}` : ""}</span></button>`; };
+  return `<div class="qrow ${d === t ? "today" : ""}" data-drop="${d}">
+    <button class="qday" data-act="day-open" data-v="${d}" aria-label="Ver ${DAYS[dow(d)]}"><b>${d === t ? "Hoy" : DAYS_S[dow(d)]}</b><span>${shortDay(d)}</span></button>
+    <div class="qbody">${list.length ? `<div class="qchips">${list.map(chip).join("")}</div>` : `<div class="qfree">Libre</div>`}
+      ${tags.length || rs.length ? `<div class="qmeta">${tags.join("")}${rs.length ? `<button class="tag" style="--c:#C9C2D6" data-act="day-open" data-v="${d}">${rs.length} ${rs.length === 1 ? "rutina" : "rutinas"}${rDone ? ` · ${rDone} ✓` : ""}</button>` : ""}</div>` : ""}</div>
+    <button class="qadd" data-act="new-task" data-day="${d}" aria-label="Agregar tarea el ${DAYS[dow(d)]}">${ic("plus", 2.4)}</button>
+  </div>`;
+}
+function routinesSection(){
+  const rs = routines();
+  return `<section class="sec"><div class="sec-h"><h2>Rutinas</h2><button class="btn sm ghost" data-act="new-routine">${ic("plus")}Nueva rutina</button></div>
+    <p class="small muted" style="margin:0">Lo de todos los días, como sacar a Vita a la mañana. No aparece en la vista rápida; la ves al abrir cada día y, si querés, la marcás para sumar estrellitas.</p>
+    ${rs.length ? `<div class="card rlist">${rs.map(r => `<div class="list-row"><span class="who" style="display:flex">${(r.who||[]).map(k => charSVG(prof(k))).join("")}</span><div class="grow"><b>${esc(r.title)}</b><div class="small muted">${(r.days||[]).length === 7 ? "Todos los días" : (r.days||[]).map(d => DAYS_S[d]).join(" · ")} · ${SLOTS[r.slot || ""]}</div></div><button class="btn sm ghost" data-act="edit-routine" data-v="${r.id}">Editar</button></div>`).join("")}</div>` : `<div class="empty">Sin rutinas todavía.</div>`}
+  </section>`;
+}
+function dayInner(d){
+  const list = tasksOn(d).filter(x => !x.routine), rs = routinesOn(d);
+  return `<div class="row" style="justify-content:space-between"><h2>${d === todayS() ? "Hoy" : DAYS[dow(d)]} ${shortDay(d)}</h2><button class="x" data-close-day="1" aria-label="Cerrar">${ic("x",2.4)}</button></div>
+    ${dayTags(d)}
+    <div class="field"><span class="lbl">Tareas</span>${list.length ? `<div class="tasks">${list.map(x => taskCard(x)).join("")}</div>` : `<div class="small muted">Nada fuera de lo de siempre.</div>`}
+      <button class="add-day" data-act="new-task" data-day="${d}">+ Agregar tarea</button></div>
+    ${rs.length ? `<div class="field"><span class="lbl">Rutinas</span><div class="card rlist" style="padding:4px 12px">${rs.map(r => { const on = !!store.tasks[rtId(r.id, d)];
+      return `<div class="list-row"><span class="who" style="display:flex">${(r.who||[]).map(k => charSVG(prof(k))).join("")}</span><div class="grow"><b>${esc(r.title)}</b><div class="small muted">${SLOTS[r.slot || ""]}</div></div><button class="rcheck" data-act="routine-toggle" data-v="${r.id}" data-d="${d}" aria-pressed="${on}" aria-label="${on ? "Desmarcar" : "Marcar hecha"}">${ic("check",3)}</button></div>`; }).join("")}</div></div>` : ""}`;
+}
+function openDay(d){
+  ui.daySheet = d;
+  openSheet(`<div class="daysheet" style="display:contents">${dayInner(d)}</div>`, sheet => {
+    sheet.addEventListener("click", e => { if (e.target.closest("[data-close-day]")) closeSheet(); });
+  });
+}
+function toggleRoutine(rid, d, x, y){
+  const r = store.routines?.[rid]; if (!r) return;
+  const id = rtId(rid, d);
+  if (store.tasks[id]){ del("tasks", id); return; }
+  const by = (r.who && r.who.length) ? r.who : [me];
+  put("tasks", id, { title:r.title, kind:"hogar", assignees:by, day:d, time:null, points:r.points || 1, repeat:"none", status:"done", doneBy:by, doneAt:nowLocal(), routine:true, routineId:rid, createdAt:nowLocal(), createdBy:me });
+  burst(x, y); toast(`+${r.points || 1} ⭐ para ${by.map(k => prof(k).name).join(" y ")}`);
+}
+function routineSheet(id){
+  const r = id ? store.routines[id] : { title:"", who:[me], days:[0,1,2,3,4,5,6], slot:"manana", points:1 };
+  const d = { who:[...r.who], days:[...r.days], slot:r.slot || "", points:r.points || 1 };
+  openSheet(`<form style="display:contents"><h2>${id ? "Editar rutina" : "Nueva rutina"}</h2>
+    <div class="field"><label for="rtTitle">¿Qué es?</label><input class="inp" id="rtTitle" required maxlength="60" value="${esc(r.title)}" placeholder="Sacar a Vita"></div>
+    <div class="field"><span class="lbl">¿Quién?</span><div class="wrap-row">${KEYS.map(k => `<button type="button" class="chip" data-who="${k}" aria-pressed="${d.who.includes(k)}">${charSVG(prof(k))}${esc(prof(k).name)}</button>`).join("")}</div></div>
+    <div class="field"><span class="lbl">Días</span><div class="wrap-row">${DAYS_S.map((n,i) => `<button type="button" class="chip" data-day="${i}" aria-pressed="${d.days.includes(i)}">${n}</button>`).join("")}</div></div>
+    <div class="field"><span class="lbl">Momento</span><div class="wrap-row">${Object.entries(SLOTS).map(([k,v]) => `<button type="button" class="chip" data-slot="${k}" aria-pressed="${d.slot===k}">${v}</button>`).join("")}</div></div>
+    <div class="field"><span class="lbl">Estrellitas si la marcás</span><div class="wrap-row">${[1,2,3].map(p => `<button type="button" class="chip" data-pts="${p}" aria-pressed="${d.points===p}"><span class="stars">${"★".repeat(p)}</span></button>`).join("")}</div></div>
+    <div class="sheet-foot">${id ? `<button type="button" class="btn danger" data-del="1">Borrar</button>` : ""}<span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
+    sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.who){ const k = b.dataset.who; d.who = d.who.includes(k) ? d.who.filter(x => x !== k) : [...d.who, k]; b.setAttribute("aria-pressed", d.who.includes(k)); }
+      if (b.dataset.day){ const i = +b.dataset.day; d.days = d.days.includes(i) ? d.days.filter(x => x !== i) : [...d.days, i].sort(); b.setAttribute("aria-pressed", d.days.includes(i)); }
+      if ("slot" in b.dataset){ d.slot = b.dataset.slot; sheet.querySelectorAll("[data-slot]").forEach(x => x.setAttribute("aria-pressed", x === b)); }
+      if (b.dataset.pts){ d.points = +b.dataset.pts; sheet.querySelectorAll("[data-pts]").forEach(x => x.setAttribute("aria-pressed", x === b)); }
+      if (b.dataset.del){ del("routines", id); closeSheet(); toast("Rutina borrada"); }
+      if (b.dataset.close) closeSheet(); });
+    sheet.querySelector("form").addEventListener("submit", e => { e.preventDefault();
+      const title = $("#rtTitle").value.trim(); if (!title) return;
+      if (!d.who.length || !d.days.length){ toast("Elegí al menos una persona y un día."); return; }
+      put("routines", id || uid8(), { title, who:d.who, days:d.days, slot:d.slot, points:d.points });
+      closeSheet(); toast(id ? "Rutina actualizada" : "Rutina sumada"); });
+  });
+}
+
+/* ============ hábitos: mes y año ============ */
+function habitRows(h){ return h.mode === "together" ? [["both","Juntos"]] : KEYS.map(k => [k, prof(k).name]); }
+function habitColor(h, w){ return h.kind === "treat" ? "#F49A86" : w === "both" ? "#B58AE8" : prof(w).color; }
+function habitMonthCard(h, m){
+  const [Y, M] = m.split("-").map(Number), n = new Date(Y, M, 0).getDate(), t = todayS();
+  const days = Array.from({ length:n }, (_, i) => `${m}-${pad(i+1)}`);
+  return `<div class="card habit ${h.kind==="treat"?"treat":""}"><b>${esc(h.name)}</b>
+    ${habitRows(h).map(([w]) => { const cnt = days.filter(d => store.habitlog[logKey(h.id, d, w)]).length;
+      return `<div class="hrow">${w === "both" ? `<span class="who">${charSVG(prof("pau"))}${charSVG(prof("fede"))}</span>` : charSVG(prof(w))}
+        <div class="hm-grid" style="--hc:${habitColor(h, w)}">${"<i class=\"blank\"></i>".repeat(dow(days[0]))}${days.map(d => `<i class="${store.habitlog[logKey(h.id, d, w)] ? "on" : ""} ${d > t ? "fut" : ""}" title="${parse(d).getDate()}"></i>`).join("")}</div>
+        <span class="hcnt tnum">${cnt}</span></div>`; }).join("")}</div>`;
+}
+function habitYearCard(h, y){
+  const logs = Object.values(store.habitlog).filter(l => l.habit === h.id && l.date.startsWith(y + "-"));
+  return `<div class="card habit ${h.kind==="treat"?"treat":""}"><b>${esc(h.name)}</b>
+    ${habitRows(h).map(([w]) => { const per = Array(12).fill(0); logs.filter(l => l.who === w).forEach(l => per[+l.date.slice(5,7) - 1]++); const max = Math.max(1, ...per), tot = per.reduce((a,b) => a + b, 0);
+      return `<div class="hrow">${w === "both" ? `<span class="who">${charSVG(prof("pau"))}${charSVG(prof("fede"))}</span>` : charSVG(prof(w))}
+        <div class="hy" style="--hc:${habitColor(h, w)}">${per.map((c, i) => `<div title="${MONTHS[i]}: ${c}">${c ? `<em>${c}</em>` : ""}<span class="b" style="height:${Math.round(c / max * 48)}px"></span><small>${MONTHS[i][0].toUpperCase()}</small></div>`).join("")}</div>
+        <span class="hcnt tnum">${tot}</span></div>`; }).join("")}</div>`;
 }
 
 /* ============ súper: copiar y pegar ============ */
@@ -1738,7 +1916,7 @@ document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]"); if (!el) return;
   const a = el.dataset.act, v = el.dataset.v;
   if (a === "close-sheet"){ if (e.target === el) closeSheet(); return; }
-  if (readOnly && !["go","close-sheet","wk","sync","month","go-summary","replay-thx","shop-copy","mood-peek","copy","logout","push-on"].includes(a) && me){ toast("Este nido está en modo lectura."); return; }
+  if (readOnly && !["go","close-sheet","wk","sync","month","go-summary","replay-thx","shop-copy","mood-peek","copy","logout","push-on","week-mode","day-open","habit-view","hnav"].includes(a) && me){ toast("Este nido está en modo lectura."); return; }
   switch (a){
     case "go": ui.tab = v; render(); window.scrollTo({ top:0 }); break;
     case "claim": claim(v); break;
@@ -1772,6 +1950,13 @@ document.addEventListener("click", e => {
     case "go-summary": ui.tab = "resumen"; ui.month = v; render(); window.scrollTo({ top:0 }); break;
     case "month": { const [y, mo] = ui.month.split("-").map(Number); ui.month = ymd(new Date(y, mo - 1 + (+v), 1)).slice(0,7); render(); break; }
     case "letter": writeLetter(); break;
+    case "week-mode": ui.weekMode = v; try { localStorage.setItem("nido-week-mode", v); } catch {} render(); break;
+    case "day-open": openDay(v); break;
+    case "routine-toggle": { const rc = el.getBoundingClientRect(); toggleRoutine(v, el.dataset.d, rc.left + rc.width/2, rc.top + rc.height/2); break; }
+    case "new-routine": routineSheet(); break;
+    case "edit-routine": routineSheet(v); break;
+    case "habit-view": ui.habitView = v; render(); break;
+    case "hnav": if (ui.habitView === "month"){ const [hy, hm] = ui.habitMonth.split("-").map(Number); ui.habitMonth = ymd(new Date(hy, hm - 1 + (+v), 1)).slice(0,7); } else ui.habitYear += +v; render(); break;
     case "push-on": enablePush(); break;
     case "copy": { const inp = document.getElementById(v); if (inp) copyText(inp.value, "Link copiado");
       if (v === "inviteUrl" && !homeCtx().inviteSent) setTimeout(() => put("home", "main", { ...homeCtx(), inviteSent:true }), 1500); break; }
@@ -1851,6 +2036,8 @@ function seedDemo(){
   mk("Desatascar la pileta", ["pau"], addDays(t,-1), 2, { status:"done", doneBy:["pau"], doneAt:nowLocal(new Date(Date.now()-864e5)), spontaneous:true,
     thanks:{ fede:{ msg:"¡Ni me había dado cuenta y ya estaba hecho! Gracias", anim:"surprise", at:nowLocal(), seen:false } } });
   store.mood[`${t}_fede`] = { id:`${t}_fede`, who:"fede", date:t, level:4 };
+  store.routines.r1 = { id:"r1", title:"Sacar a Vita", who:["fede"], days:[0,1,2,3,4,5,6], slot:"manana", points:1 };
+  store.routines.r2 = { id:"r2", title:"Darles de comer a las gatas", who:["pau"], days:[0,1,2,3,4,5,6], slot:"noche", points:1 };
   [["gym","Ir al gym","good","solo",3,2,2],["walk","Salir a caminar","good","together",2,2,2],["cine","Ir al cine","good","together",1,2,2],["cocina","Cocinamos en casa","good","together",0,2,1],["deli","Delivery o cheat meal","treat","together",3,2,1]]
     .forEach(([id,name,kind,mode,goal,budget,points],i) => { store.habits[id] = { id, name, kind, mode, goal: kind==="treat"?0:goal, budget, points, createdAt:"2026-01-0"+(i+1), ...(id === "deli" ? { vs:"cocina" } : {}) }; });
   const L = (h, d, w) => { const id = logKey(h, d, w); store.habitlog[id] = { id, habit:h, date:d, who:w, at:d+"T10:00:00" }; };
