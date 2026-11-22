@@ -547,7 +547,7 @@ const DEFAULT_PROFILES = {
   fede:{ name:"Fede", char:"frog", color:"#7DB64A", face:"wink" },
 };
 const KEYS = ["pau","fede"];
-const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{}, routines:{}, shopmeta:{}, pets:{}, petcare:{}, petsupply:{}, petlog:{} };
+const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{}, routines:{}, shopmeta:{}, pets:{}, petcare:{}, petsupply:{}, petlog:{}, catalog:{}, rewards:{}, claims:{} };
 const ui = { tab:"inicio", weekOf: weekStart(todayS()), loaded:false, slow:false, ai:null, aiBusy:false, aiErr:"", month:todayS().slice(0,7), letter:"", letterMonth:"", letterBusy:false, weekMode:(() => { try { return localStorage.getItem("nido-week-mode") || "quick"; } catch { return "quick"; } })(), habitView:"week", habitMonth:todayS().slice(0,7), habitYear:new Date().getFullYear(), daySheet:null };
 let DB = null, USER = null, SAMPLE = null, DL = null, DEMO = false, MY_UID = null, me = null, readOnly = false;
 
@@ -800,10 +800,10 @@ function render(){
   $("#meBtn").hidden = false;
   $("#meBtn").innerHTML = charSVG(prof(me)) + esc(prof(me).name);
   $("#fab").hidden = false; $("#fab").innerHTML = ic("plus", 2.6);
-  const tabs = [["inicio","Inicio","home"],["semana","Semana","week"],["habitos","Hábitos","leaf"],["super","Súper","cart"],["avisos","Avisos","bell"],["nosotros","Nosotros","us"]];
+  const tabs = [["inicio","Inicio","home"],["semana","Semana","week"],["habitos","Hábitos","leaf"],["super","Súper","cart"],["nosotros","Nosotros","us"]];
   $("#tabs").hidden = false;
-  $("#tabs").innerHTML = tabs.map(([k,l,i]) => `<button class="tab" data-act="go" data-v="${k}" ${ui.tab===k||(k==="nosotros"&&(ui.tab==="resumen"||ui.tab==="pet"))||(k==="semana"&&ui.tab==="tareas")?'aria-current="page"':""}>${ic(i)}${l}</button>`).join("");
-  const V = { inicio:viewHome, semana:viewWeek, super:viewShop, avisos:viewReminders, nosotros:viewUs, resumen:viewSummary, habitos:viewHabits, pet:viewPet, tareas:viewAllTasks }[ui.tab] || viewHome;
+  $("#tabs").innerHTML = tabs.map(([k,l,i]) => `<button class="tab" data-act="go" data-v="${k}" ${ui.tab===k||(k==="nosotros"&&["resumen","pet","avisos","premios"].includes(ui.tab))||(k==="semana"&&ui.tab==="tareas")?'aria-current="page"':""}>${ic(i)}${l}</button>`).join("");
+  const V = { inicio:viewHome, semana:viewWeek, super:viewShop, avisos:viewReminders, nosotros:viewUs, resumen:viewSummary, habitos:viewHabits, pet:viewPet, tareas:viewAllTasks, premios:viewRewards }[ui.tab] || viewHome;
   $("#view").innerHTML = V();
   if (keep){ const el = document.getElementById(keep.id); if (el){ el.value = keep.v; el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch{} } }
   if (ui.daySheet){ const ds = document.querySelector("#layer .daysheet"); if (ds) ds.innerHTML = dayInner(ui.daySheet); else ui.daySheet = null; }
@@ -877,7 +877,7 @@ function viewHome(){
       <div class="muted">${pending ? `Hoy tenés ${pending} ${pending===1?"tarea":"tareas"} pendiente${pending===1?"":"s"}.` : mine.length ? "Hiciste todo lo de hoy. ¡Bien ahí!" : "Hoy no tenés nada agendado."}</div>
     </div></div>
     <div class="score">${KEYS.map(k => `<div class="p" style="background:${shade(prof(k).color, .55)}">${charSVG(prof(k))}<div><div class="n tnum">${k==="pau"?a:b}⭐</div><div class="small" style="font-weight:600">${esc(prof(k).name)} · esta semana</div></div></div>`).join("")}</div>
-    <div class="bal"><div class="bal-bar"><span style="width:${pa}%;background:${prof("pau").color}"></span><span style="width:${100-pa}%;background:${prof("fede").color}"></span></div><div class="bal-note">${balNote}</div></div>
+    <div class="bal"><div class="bal-bar"><span style="width:${pa}%;background:${prof("pau").color}"></span><span style="width:${100-pa}%;background:${prof("fede").color}"></span></div><div class="bal-note">${balNote}</div>${rewardNudge()}</div>
     ${moodCard()}
 
     ${late.length ? `<section class="sec"><div class="sec-h"><h2>Quedaron pendientes</h2></div><div class="tasks">${late.map(x => taskCard(x, {showDay:true})).join("")}</div></section>` : ""}
@@ -889,7 +889,7 @@ function viewHome(){
   </div><div>
     ${(() => { const dn = parse(t).getDate(), cur = t.slice(0,7), pm = (() => { const d = parse(t); d.setDate(1); d.setMonth(d.getMonth()-1); return ymd(d).slice(0,7); })(); const mm = dn <= 5 ? pm : cur;
       return `<section class="sec"><button class="month-banner" data-act="go-summary" data-v="${mm}">${stickerSVG("scallop", "#EF8BB3", charSVG({ char:"star", color:"#F6C445", face:"happy" }))}<div><div class="eyebrow">Resumen mensual</div><b>${dn <= 5 ? `Ya está el resumen de ${monthLabel(pm)}` : `Así viene su ${monthLabel(cur)}`}</b></div></button></section>`; })()}
-    ${nr ? `<section class="sec"><div class="next-rem">${charSVG({char:"dog",color:"#C08A5B",face:"happy"})}<div><div class="eyebrow">Próximo aviso · ${nr.off===0?"hoy":nr.off===1?"mañana":DAYS[(new Date().getDay()+6+nr.off)%7].toLowerCase()} ${esc(nr.r.time)} hs</div><div style="font-weight:600">${esc(nr.r.text)}</div></div></div></section>` : ""}
+    ${nr ? `<section class="sec"><div class="next-rem" data-act="go" data-v="avisos" style="cursor:pointer">${charSVG({char:"dog",color:"#C08A5B",face:"happy"})}<div><div class="eyebrow">Próximo aviso · ${nr.off===0?"hoy":nr.off===1?"mañana":DAYS[(new Date().getDay()+6+nr.off)%7].toLowerCase()} ${esc(nr.r.time)} hs</div><div style="font-weight:600">${esc(nr.r.text)}</div></div></div></section>` : ""}
     ${petHomeHTML()}
     <section class="sec"><div class="sec-h"><h2>Hábitos de hoy</h2><button class="btn sm ghost" data-act="go" data-v="habitos">Ver semana</button></div>${habitChips()}</section>
     <section class="sec"><div class="sec-h"><h2>Ideas para la semana</h2></div>
@@ -958,7 +958,8 @@ function viewShop(){
 
 function viewReminders(){
   const rs = Object.values(store.reminders).sort((a,b) => (a.time||"").localeCompare(b.time||""));
-  return `<section class="sec"><div class="sec-h"><h2>Avisos</h2><button class="btn sm pri" data-act="new-rem">${ic("plus")}Nuevo aviso</button></div>
+  return `<div class="row" style="margin-top:8px"><button class="icon-btn" data-act="go" data-v="nosotros" aria-label="Volver">${ic("left")}</button><span class="small muted">Nosotros</span></div>
+  <section class="sec"><div class="sec-h"><h2>Avisos</h2><button class="btn sm pri" data-act="new-rem">${ic("plus")}Nuevo aviso</button></div>
     ${pushCard()}
     ${rs.length ? rs.map(r => `<div class="rem ${r.active?"":"off"}">
         <div class="time tnum">${esc(r.time)}</div>
@@ -972,7 +973,11 @@ function viewReminders(){
 function viewUs(){
   const ctx = homeCtx();
   const t = todayS(), from = addDays(t, -29);
-  return `${inviteCard()}${familySection()}
+  const nRem = Object.values(store.reminders).filter(r => r.active).length;
+  return `${inviteCard()}<section class="sec"><div class="row" style="gap:10px;flex-wrap:wrap">
+      <button class="month-banner" data-act="go" data-v="premios" style="flex:1;min-width:200px;background:color-mix(in srgb,var(--sun) 28%,var(--paper))">${stickerSVG("star", "#F6C445", charSVG({ char:"heart", color:"#F0644B", face:"happy" }))}<div><div class="eyebrow">Premios</div><b>Tenés ${starBalance(me)}⭐ para canjear</b></div></button>
+      <button class="month-banner" data-act="go" data-v="avisos" style="flex:1;min-width:200px;background:color-mix(in srgb,var(--teal) 18%,var(--paper))">${stickerSVG("scallop", "#3BBDAE", charSVG({ char:"dog", color:"#C08A5B", face:"happy" }))}<div><div class="eyebrow">Avisos</div><b>${nRem} ${nRem === 1 ? "aviso activo" : "avisos activos"}${ui.pushState === "on" ? "" : " · activá las notificaciones"}</b></div></button>
+    </div></section>${familySection()}
   <section class="sec"><div class="sec-h"><h2>Perfiles y estrellitas</h2></div>
     <div class="prof">${KEYS.map(k => { const P = prof(k), st = stickersFor(k), got = st.filter(s => s.got).length;
       return `<div class="card"><div class="head">${charSVG(P)}<div><h3>${esc(P.name)}${k===me?' <span class="pill">vos</span>':""}</h3>
@@ -1034,8 +1039,9 @@ function taskSheet(id, presetDay){
       <button type="button" class="btn sm" data-quick="">A la cola</button></div></div>` : ""}
     <div class="field"><span class="lbl">Tipo</span><div class="wrap-row">${Object.entries(KINDS).map(([k,v]) => `<button type="button" class="chip" data-pick="kind" data-v="${k}" aria-pressed="${draft.kind===k}">${v}</button>`).join("")}</div>
       <span class="small muted" id="kindHint">${KIND_HINT[draft.kind]}</span></div>
-    <div class="field"><label for="tTitle">¿Qué hay que hacer?</label><input class="inp" id="tTitle" required maxlength="80" value="${esc(t.title)}" placeholder="${draft.kind==="gestion"?"Pedir turno al veterinario":"Lavar sábanas"}">
-      ${!id ? `<div class="wrap-row" id="tplRow">${tplChips(draft.kind)}</div>
+    ${!id ? `<div class="field"><label for="tPick">Elegí una frecuente…</label>${catalogSelect("tPick")}</div>` : ""}
+    <div class="field"><label for="tTitle">${id ? "¿Qué hay que hacer?" : "…o escribila"}</label><input class="inp" id="tTitle" required maxlength="80" value="${esc(t.title)}" placeholder="${draft.kind==="gestion"?"Pedir turno al veterinario":"Lavar las sábanas"}">
+      ${!id ? `
       <div class="wrap-row" style="align-items:center"><span class="small muted">O en pasos:</span>${BATCHES.map((b, i) => `<button type="button" class="chip" data-batch="${i}">${esc(b[0])} · ${b[1].length} pasos</button>`).join("")}<button type="button" class="chip" data-batch="new">+ Armar tanda</button></div>` : ""}</div>
     <div class="field"><span class="lbl">¿Quién la hace?</span><div class="wrap-row">
       ${KEYS.map(k => `<button type="button" class="chip" data-pick="who" data-v="${k}" aria-pressed="${whoPressed(draft.assignees)(k)}">${charSVG(prof(k))}${esc(prof(k).name)}</button>`).join("")}
@@ -1075,6 +1081,13 @@ function taskSheet(id, presetDay){
     const autoCal = () => { if (calTouched) return; draft.cal = BIG_RE.test(norm($("#tTitle").value)); sheet.querySelector("#tCal").setAttribute("aria-checked", draft.cal); };
     hints();
     $("#tTitle").addEventListener("change", () => { applyOwner(); autoCal(); });
+    sheet.querySelector("#tPick")?.addEventListener("change", e => {
+      const c = store.catalog[e.target.value]; if (!c) return;
+      $("#tTitle").value = c.title; draft.points = c.points || 2; draft.kind = c.kind || "hogar";
+      syncPressed(sheet, "pts", v => +v === draft.points); syncPressed(sheet, "kind", v => v === draft.kind); sheet.querySelector("#kindHint").textContent = KIND_HINT[draft.kind];
+      if (!calTouched){ draft.cal = !!c.cal || BIG_RE.test(norm(c.title)); sheet.querySelector("#tCal").setAttribute("aria-checked", draft.cal); }
+      applyOwner();
+    });
     sheet.addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.batch != null){ const pd = draft.day; closeSheet(); batchSheet(b.dataset.batch === "new" ? null : BATCHES[+b.dataset.batch], pd); return; }
@@ -1107,6 +1120,7 @@ function taskSheet(id, presetDay){
         updateHome(h => { const o = { ...(h.owners || {}) }; if (ow) o[okey(title)] = { title, who:ow }; else delete o[okey(title)]; return { ...h, owners:o }; });
       }
       put("tasks", id || uid8(), data);
+      if (!id && !store.catalog[ckey(title)]) put("catalog", ckey(title), { title, kind:data.kind, points:data.points, cal:!!data.cal });
       closeSheet();
       toast(id ? "Cambios guardados" : data.day ? `Anotada para ${dayLabel(data.day).toLowerCase()}` : "Anotada en la cola");
     });
@@ -1249,18 +1263,21 @@ function quickDoneSheet(){
   openSheet(`<form style="display:contents"><h2>Hice algo que no estaba anotado</h2>
     <p class="small muted" style="margin:0">Así queda registrado igual, aunque no estuviera en la lista.</p>
     <div class="field"><span class="lbl">Tipo</span><div class="wrap-row">${Object.entries(KINDS).map(([k,v]) => `<button type="button" class="chip" data-pick="kind" data-v="${k}" aria-pressed="${k==="hogar"}">${v}</button>`).join("")}</div></div>
-    <div class="field"><label for="qTitle">¿Qué hiciste?</label><input class="inp" id="qTitle" required maxlength="80" placeholder="Desatascar la pileta"><div class="wrap-row" id="qTpl">${tplChips("hogar")}</div></div>
+    <div class="field"><label for="qTitle">¿Qué hiciste?</label><input class="inp" id="qTitle" required maxlength="80" placeholder="Desatascar la pileta"></div>
+    <div class="field"><label for="qPick">…o elegí una frecuente</label>${catalogSelect("qPick")}</div>
     <div class="field"><span class="lbl">¿Quién lo hizo?</span><div class="wrap-row">${KEYS.map(k => `<button type="button" class="chip" data-pick="who" data-v="${k}" aria-pressed="${k===me}">${charSVG(prof(k))}${esc(prof(k).name)}</button>`).join("")}<button type="button" class="chip" data-pick="who" data-v="both" aria-pressed="false">Los dos</button></div></div>
     <div class="field"><span class="lbl">¿Cuánto esfuerzo?</span><div class="wrap-row">${effortChips(1)}</div></div>
     <div class="sheet-foot"><span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Sumar estrellitas</button></div></form>`, sheet => {
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
-      if (b.dataset.tpl){ $("#qTitle").value = b.dataset.tpl; d.points = +b.dataset.p; syncPressed(sheet, "pts", v => +v === d.points); return; }
+      if (b.dataset.tpl){ return; }
       if (b.dataset.pick){ const g = b.dataset.pick, v = b.dataset.v;
         sheet.querySelectorAll(`[data-pick=${g}]`).forEach(x => x.setAttribute("aria-pressed", x === b));
-        if (g === "kind"){ d.kind = v; $("#qTpl").innerHTML = tplChips(v); }
+        if (g === "kind") d.kind = v;
         if (g === "who") d.by = v === "both" ? [...KEYS] : [v];
         if (g === "pts") d.points = +v; return; }
       if (b.dataset.close) closeSheet(); });
+    sheet.querySelector("#qPick").addEventListener("change", e => { const c = store.catalog[e.target.value]; if (!c) return;
+      $("#qTitle").value = c.title; d.points = c.points || 2; d.kind = c.kind || "hogar"; syncPressed(sheet, "pts", v => +v === d.points); syncPressed(sheet, "kind", v => v === d.kind); });
     sheet.querySelector("form").addEventListener("submit", e => { e.preventDefault();
       const title = $("#qTitle").value.trim(); if (!title) return;
       put("tasks", uid8(), { title, kind:d.kind, assignees:d.by, day:todayS(), time:null, points:d.points, repeat:"none", status:"done", doneBy:d.by, doneAt:nowLocal(), spontaneous:true, createdAt:nowLocal(), createdBy:me });
@@ -2203,6 +2220,12 @@ function nextStepSheet(n, prev){
 }
 
 /* ============ todas las tareas ============ */
+function freqList(q){
+  const c = catalog().filter(x => !q || norm(x.title).includes(q));
+  return `<div class="row" style="justify-content:space-between"><span class="small muted">Son las que aparecen en el desplegable. Tocá una para cambiarle nombre, esfuerzo o dueño.</span><button class="btn sm pri" data-act="cat-new">${ic("plus")}Nueva</button></div>
+    ${c.length ? `<div class="card" style="padding:4px 14px">${c.map(x => { const own = ownerOf(x.title);
+      return `<button class="list-row" style="width:100%;text-align:left" data-act="cat-edit" data-v="${esc(x.id)}"><div class="grow"><b>${esc(x.title)}</b><div class="small muted">${KINDS[x.kind || "hogar"]} · <span class="stars">${"★".repeat(x.points || 1)}</span> ${EFFORT[(x.points || 1) - 1]}${own ? ` · ${CROWN} de ${esc(prof(own).name)}` : ""}${x.cal ? " · Calendar" : ""}</div></div></button>`; }).join("")}</div>` : `<div class="empty">No hay frecuentes${q ? " con esa búsqueda" : ""}.</div>`}`;
+}
 function viewAllTasks(){
   const f = ui.tf || "pend", w = ui.tw || "all", q = norm(ui.tq || ""), t = todayS();
   const match = x => (w === "all" || (x.assignees || []).includes(w) || (x.doneBy || []).includes(w)) && (!q || norm(x.title).includes(q) || norm(x.batch?.name || "").includes(q));
@@ -2212,15 +2235,120 @@ function viewAllTasks(){
     groups = {}; list.forEach(x => { (groups[x.day] ||= []).push(x); }); }
   else if (f === "cola") list = base.filter(x => !x.day && x.status !== "done").sort(sortTasks);
   else if (f === "rep") list = base.filter(x => x.status !== "done" && ((x.repeat && x.repeat !== "none") || x.batch)).sort((a,b) => (a.day || "9").localeCompare(b.day || "9"));
-  else list = base.filter(x => x.status === "done" && x.doneAt >= addDays(t, -60)).sort((a,b) => b.doneAt.localeCompare(a.doneAt));
+  else if (f === "done") list = base.filter(x => x.status === "done" && x.doneAt >= addDays(t, -60)).sort((a,b) => b.doneAt.localeCompare(a.doneAt));
   const counts = { pend: tasks().filter(x => !x.routine && x.day && x.status !== "done").length, cola: tasks().filter(x => !x.day && x.status !== "done").length };
   return `<div class="row" style="margin-top:8px"><button class="icon-btn" data-act="go" data-v="semana" aria-label="Volver">${ic("left")}</button><h2 style="font-size:22px">Todas las tareas</h2></div>
     <section class="sec"><input class="inp" id="taskSearch" placeholder="Buscar una tarea" value="${esc(ui.tq || "")}" autocomplete="off">
-      <div class="seg" style="flex-wrap:wrap">${[["pend",`Agendadas (${counts.pend})`],["cola",`En la cola (${counts.cola})`],["rep","Repetidas y tandas"],["done","Hechas"]].map(([k,l]) => `<button data-act="tf" data-v="${k}" aria-pressed="${f===k}">${l}</button>`).join("")}</div>
+      <div class="seg" style="flex-wrap:wrap">${[["pend",`Agendadas (${counts.pend})`],["cola",`En la cola (${counts.cola})`],["freq","Frecuentes"],["rep","Repetidas y tandas"],["done","Hechas"]].map(([k,l]) => `<button data-act="tf" data-v="${k}" aria-pressed="${f===k}">${l}</button>`).join("")}</div>
       <div class="wrap-row">${[["all","Los dos"], ...KEYS.map(k => [k, prof(k).name])].map(([k,l]) => `<button class="chip" data-act="tw" data-v="${k}" aria-pressed="${w===k}">${esc(l)}</button>`).join("")}</div></section>
-    <section class="sec">${!list.length ? `<div class="empty">No hay tareas acá${q ? " con esa búsqueda" : ""}.</div>` :
+    <section class="sec">${f === "freq" ? freqList(q) : !list.length ? `<div class="empty">No hay tareas acá${q ? " con esa búsqueda" : ""}.</div>` :
       groups ? Object.entries(groups).map(([d, xs]) => `<div class="eyebrow" style="margin-top:6px">${dayLabel(d)} ${shortDay(d)}</div><div class="tasks">${xs.map(x => taskCard(x)).join("")}</div>`).join("") :
       `<div class="tasks">${list.map(x => taskCard(x, { showDay:true })).join("")}</div>`}</section>`;
+}
+
+/* ============ tareas frecuentes (catálogo) ============ */
+const ckey = s => norm(s).replace(/\b(el|la|los|las|un|una|unos|unas|de|del|a|al|y)\b/g, " ").split(/[^a-z0-9]+/).filter(Boolean).map(w => w.length > 3 ? w.replace(/s$/, "") : w).join("-") || "x";
+const catalog = () => Object.values(store.catalog || {}).sort((a,b) => a.title.localeCompare(b.title, "es"));
+function ensureCatalog(){
+  if (readOnly || !me || Object.keys(store.catalog || {}).length) return;
+  const seen = new Set(), add = (title, points, kind) => { const k = ckey(title); if (seen.has(k)) return; seen.add(k); put("catalog", k, { title, points, kind }); };
+  TEMPLATES.forEach(([n, p]) => add(n, p, "hogar"));
+  TEMPLATES_G.forEach(([n, p]) => add(n, p, "gestion"));
+  tasks().filter(t => !t.routine && !t.via && !t.items && !t.batch && !t.pet && t.title).forEach(t => add(t.title, t.points || 2, t.kind || "hogar"));
+}
+function catalogSelect(selId){
+  const c = catalog(), grp = k => c.filter(x => (x.kind || "hogar") === k).map(x => `<option value="${esc(x.id)}">${esc(x.title)}</option>`).join("");
+  return `<select class="inp" id="${selId}"><option value="">Elegí una tarea frecuente…</option><optgroup label="Hogar">${grp("hogar")}</optgroup><optgroup label="Gestión">${grp("gestion")}</optgroup></select>`;
+}
+function catalogSheet(id){
+  const c = id ? store.catalog[id] : { title:"", kind:"hogar", points:2, cal:false };
+  const d = { kind:c.kind || "hogar", points:c.points || 2, cal:!!c.cal, owner: id ? ownerOf(c.title) : null };
+  openSheet(`<form style="display:contents"><h2>${id ? "Editar tarea frecuente" : "Nueva tarea frecuente"}</h2>
+    <div class="field"><label for="cfTitle">Nombre</label><input class="inp" id="cfTitle" required maxlength="80" value="${esc(c.title)}" placeholder="Pasar la aspiradora"></div>
+    <div class="field"><span class="lbl">Tipo</span><div class="wrap-row">${Object.entries(KINDS).map(([k,v]) => `<button type="button" class="chip" data-pick="kind" data-v="${k}" aria-pressed="${d.kind===k}">${v}</button>`).join("")}</div></div>
+    <div class="field"><span class="lbl">¿Cuánto esfuerzo?</span><div class="wrap-row">${effortChips(d.points)}</div></div>
+    <div class="field"><span class="lbl">Dueño</span><div class="wrap-row"><button type="button" class="chip" data-pick="owner" data-v="" aria-pressed="${!d.owner}">Nadie fijo</button>${KEYS.map(k => `<button type="button" class="chip" data-pick="owner" data-v="${k}" aria-pressed="${d.owner===k}">${CROWN}${esc(prof(k).name)}</button>`).join("")}</div></div>
+    <div class="field"><div class="row"><button type="button" class="switch" role="switch" id="cfCal" aria-checked="${d.cal}" aria-label="En Google Calendar"></button><span><b>En Google Calendar</b><span class="small muted" style="display:block">Cada vez que la anoten, aparece en el calendario.</span></span></div></div>
+    <div class="sheet-foot">${id ? `<button type="button" class="btn danger" data-del="1">Borrar</button>` : ""}<span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
+    sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      if (b.id === "cfCal"){ d.cal = !d.cal; b.setAttribute("aria-checked", d.cal); return; }
+      if (b.dataset.pick){ const g = b.dataset.pick, v = b.dataset.v; sheet.querySelectorAll(`[data-pick=${g}]`).forEach(x => x.setAttribute("aria-pressed", x === b));
+        if (g === "kind") d.kind = v; if (g === "pts") d.points = +v; if (g === "owner") d.owner = v || null; return; }
+      if (b.dataset.del){ del("catalog", id); closeSheet(); toast("Sacada de las frecuentes"); }
+      if (b.dataset.close) closeSheet(); });
+    sheet.querySelector("form").addEventListener("submit", e => { e.preventDefault();
+      const title = $("#cfTitle").value.trim(); if (!title) return;
+      const nk = ckey(title);
+      if (id && nk !== id) del("catalog", id);
+      put("catalog", nk, { title, kind:d.kind, points:d.points, cal:d.cal });
+      if ((d.owner || null) !== ownerOf(title)){ const ow = d.owner; updateHome(h => { const o = { ...(h.owners || {}) }; if (ow) o[okey(title)] = { title, who:ow }; else delete o[okey(title)]; return { ...h, owners:o }; }); }
+      closeSheet(); toast("Guardada"); });
+  });
+}
+
+/* ============ premios ============ */
+const lifetimeStars = k => pointsBy(k, "2000-01-01", "2999-12-31") + habitScore("2000-01-01", "2999-12-31")[k];
+const spentStars = k => Object.values(store.claims || {}).filter(c => c.by === k).reduce((s, c) => s + (c.cost || 0), 0);
+const starBalance = k => lifetimeStars(k) - spentStars(k);
+const rewardsOf = k => Object.values(store.rewards || {}).filter(r => r.owner === k).sort((a,b) => a.cost - b.cost);
+const REWARD_PRESETS = [["Elegir la peli o la serie",20],["Me libro de una tarea fiaca extrema",40],["Desayuno en la cama",60],["Masajes de 20 minutos",80],["Una tarde libre sin tareas",100],["Salida a comer, invita el otro",150]];
+function rewardNudge(){
+  const bal = starBalance(me), rs = rewardsOf(me);
+  if (!rs.length) return `<button class="bal-note" data-act="go" data-v="premios" style="text-decoration:underline;text-underline-offset:3px">Armá tus premios para canjear con estrellitas</button>`;
+  const can = rs.filter(r => r.cost <= bal).pop(), next = rs.find(r => r.cost > bal);
+  if (can) return `<button class="month-banner" data-act="go" data-v="premios" style="margin-top:10px;background:color-mix(in srgb,var(--sun) 30%,var(--paper))">${stickerSVG("star", "#F6C445", charSVG({ char:"heart", color:"#F0644B", face:"party" }))}<div><div class="eyebrow">Tenés ${bal}⭐ disponibles</div><b>Ya podés canjear “${esc(can.title)}”</b></div></button>`;
+  return `<button class="bal-note" data-act="go" data-v="premios">Te faltan ${next.cost - bal}⭐ para “${esc(next.title)}” ›</button>`;
+}
+function viewRewards(){
+  const o = other(me), mine = rewardsOf(me), bal = starBalance(me);
+  const open = Object.values(store.claims || {}).filter(c => !c.fulfilled).sort((a,b) => b.at.localeCompare(a.at));
+  const done = Object.values(store.claims || {}).filter(c => c.fulfilled).sort((a,b) => (b.fulfilledAt || "").localeCompare(a.fulfilledAt || "")).slice(0, 8);
+  const presets = REWARD_PRESETS.filter(([n]) => !mine.some(r => norm(r.title) === norm(n)));
+  const rRow = (r, own) => { const pct = Math.min(100, starBalance(r.owner) / r.cost * 100), ok = starBalance(r.owner) >= r.cost;
+    return `<div class="list-row"><div class="grow"><b>${esc(r.title)}</b><div class="bar" style="height:8px;margin-top:6px"><span style="width:${pct}%;background:${ok ? "var(--frog)" : "var(--sun)"}"></span></div><div class="small muted tnum" style="margin-top:3px">${r.cost}⭐</div></div>
+      ${own ? `<button class="btn sm ${ok ? "pri" : "ghost"}" data-act="reward-claim" data-v="${r.id}" ${ok ? "" : "disabled"}>Canjear</button><button class="btn sm ghost" data-act="reward-edit" data-v="${r.id}">Editar</button>` : ""}</div>`; };
+  return `<div class="row" style="margin-top:8px"><button class="icon-btn" data-act="go" data-v="nosotros" aria-label="Volver">${ic("left")}</button><h2 style="font-size:22px">Premios</h2></div>
+    <p class="small muted" style="margin:8px 0 0">Cada uno arma sus premios y les pone un precio en estrellitas. Cuando juntás suficientes, lo canjeás y el otro lo cumple.</p>
+    <div class="score" style="margin-top:12px">${KEYS.map(k => `<div class="p" style="background:${shade(prof(k).color, .55)}">${charSVG(prof(k))}<div><div class="n tnum">${starBalance(k)}⭐</div><div class="small" style="font-weight:600">${esc(prof(k).name)} · para canjear</div></div></div>`).join("")}</div>
+    ${open.length ? `<section class="sec"><div class="sec-h"><h2>Por cumplir</h2></div><div class="card" style="padding:4px 14px">${open.map(c => `<div class="list-row">${charSVG(prof(c.by))}<div class="grow"><b>${esc(c.title)}</b><div class="small muted">${esc(prof(c.by).name)} lo canjeó ${agoText(c.at)}</div></div>${c.by !== me ? `<button class="btn sm pri" data-act="claim-done" data-v="${c.id}">Cumplido</button>` : `<span class="small muted">Esperando a ${esc(prof(o).name)}</span>`}</div>`).join("")}</div></section>` : ""}
+    <section class="sec"><div class="sec-h"><h2>Tus premios</h2><button class="btn sm ghost" data-act="reward-new">${ic("plus")}Premio</button></div>
+      ${mine.length ? `<div class="card" style="padding:4px 14px">${mine.map(r => rRow(r, true)).join("")}</div>` : `<div class="empty">Todavía no armaste premios. Elegí alguno de abajo o creá el tuyo.</div>`}
+      ${presets.length ? `<div class="wrap-row" style="align-items:center"><span class="small muted">Ideas:</span>${presets.map(([n, c]) => `<button class="chip" data-act="reward-preset" data-v="${esc(n)}" data-c="${c}">+ ${esc(n)} · ${c}⭐</button>`).join("")}</div>` : ""}</section>
+    <section class="sec"><div class="sec-h"><h2>Los premios de ${esc(prof(o).name)}</h2></div>
+      ${rewardsOf(o).length ? `<div class="card" style="padding:4px 14px">${rewardsOf(o).map(r => rRow(r, false)).join("")}</div>` : `<div class="empty">${esc(prof(o).name)} todavía no armó sus premios.</div>`}</section>
+    ${done.length ? `<section class="sec"><div class="sec-h"><h2>Ya cumplidos</h2></div><div class="card" style="padding:4px 14px">${done.map(c => `<div class="list-row">${charSVG(prof(c.by))}<div class="grow"><b>${esc(c.title)}</b><div class="small muted">${c.cost}⭐ · ${c.fulfilledAt ? shortDay(c.fulfilledAt.slice(0,10)) : ""}</div></div></div>`).join("")}</div></section>` : ""}`;
+}
+function rewardSheet(id, preset){
+  const r = id ? store.rewards[id] : { title:preset?.title || "", cost:preset?.cost || 50 };
+  openSheet(`<form style="display:contents"><h2>${id ? "Editar premio" : "Nuevo premio"}</h2>
+    <div class="field"><label for="rwTitle">¿Qué querés?</label><input class="inp" id="rwTitle" required maxlength="60" value="${esc(r.title)}" placeholder="Desayuno en la cama"></div>
+    <div class="field"><label for="rwCost">¿Cuántas estrellitas cuesta?</label><input class="inp" id="rwCost" type="text" inputmode="numeric" value="${r.cost}" style="max-width:120px"><span class="small muted">Como referencia: una semana normal da entre 15 y 30 estrellitas.</span></div>
+    <div class="sheet-foot">${id ? `<button type="button" class="btn danger" data-del="1">Borrar</button>` : ""}<span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
+    sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.del){ del("rewards", id); closeSheet(); }
+      if (b.dataset.close) closeSheet(); });
+    sheet.querySelector("form").addEventListener("submit", e => { e.preventDefault();
+      const title = $("#rwTitle").value.trim(), cost = parseInt($("#rwCost").value, 10);
+      if (!title || !(cost > 0)){ toast("Poné un premio y cuántas estrellitas cuesta."); return; }
+      put("rewards", id || uid8(), { owner:me, title, cost }); closeSheet(); toast("Premio guardado"); });
+  });
+}
+function claimSheet(id){
+  const r = store.rewards[id], bal = starBalance(me); if (!r) return;
+  if (bal < r.cost){ toast(`Te faltan ${r.cost - bal}⭐`); return; }
+  const o = other(me);
+  openSheet(`<div style="display:flex;justify-content:center">${stickerSVG("star", "#F6C445", charSVG({ ...prof(me), face:"party" })).replace("<svg ", '<svg style="width:120px;height:120px" ')}</div>
+    <h2 style="text-align:center">¿Canjeás “${esc(r.title)}”?</h2>
+    <p style="margin:0;text-align:center">Cuesta ${r.cost}⭐. Te quedan ${bal - r.cost}⭐. Le avisamos a ${esc(prof(o).name)} para que lo cumpla.</p>
+    <div class="sheet-foot" style="justify-content:center"><button class="btn ghost" data-close="1">Todavía no</button><button class="btn pri" data-go="1">¡Canjear!</button></div>`, sheet => {
+    sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.close) closeSheet();
+      if (b.dataset.go){
+        put("claims", uid8(), { by:me, rewardId:id, title:r.title, cost:r.cost, at:nowLocal(), fulfilled:false });
+        notify([o], `${prof(me).name} canjeó un premio: ${r.title} 🎁 Te toca cumplirlo.`);
+        closeSheet(); burst(innerWidth / 2, innerHeight / 2); toast(`¡Canjeado! Le avisamos a ${prof(o).name}.`);
+      } });
+  });
 }
 
 /* ============ súper: copiar y pegar ============ */
@@ -2376,6 +2504,13 @@ document.addEventListener("click", e => {
     case "go-summary": ui.tab = "resumen"; ui.month = v; render(); window.scrollTo({ top:0 }); break;
     case "month": { const [y, mo] = ui.month.split("-").map(Number); ui.month = ymd(new Date(y, mo - 1 + (+v), 1)).slice(0,7); render(); break; }
     case "letter": writeLetter(); break;
+    case "cat-new": catalogSheet(); break;
+    case "cat-edit": catalogSheet(v); break;
+    case "reward-new": rewardSheet(); break;
+    case "reward-edit": rewardSheet(v); break;
+    case "reward-preset": rewardSheet(null, { title:v, cost:+el.dataset.c }); break;
+    case "reward-claim": claimSheet(v); break;
+    case "claim-done": { const c = store.claims[v]; if (c){ patch("claims", v, { fulfilled:true, fulfilledAt:nowLocal() }); notify([c.by], `${prof(me).name} cumplió tu premio: ${c.title} 💜`); toast("¡Premio cumplido!"); } break; }
     case "tf": ui.tf = v; render(); break;
     case "tw": ui.tw = v; render(); break;
     case "sync-retry": ui.saveErr = null; flushOutbox(); break;
@@ -2538,7 +2673,7 @@ function renderSetup(){
 async function boot(){
   const cfg = window.NIDO_CONFIG || {};
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-  if (!cfg.supabaseUrl || !window.supabase){ DEMO = true; seedDemo(); me = "pau"; ui.loaded = true; ui.pushState = "demo"; render(); setTimeout(checkSupplies, 800); return; }
+  if (!cfg.supabaseUrl || !window.supabase){ DEMO = true; seedDemo(); me = "pau"; ui.loaded = true; ui.pushState = "demo"; render(); setTimeout(checkSupplies, 800); setTimeout(ensureCatalog, 900); return; }
   SB = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth:{ persistSession:true, autoRefreshToken:true } });
   const { data:{ session } } = await SB.auth.getSession();
   if (!session){ renderLogin(); return; }
@@ -2562,6 +2697,7 @@ async function boot(){
   setInterval(() => { if (Object.keys(outbox).length && !saving) flushOutbox(); }, 30000);
   subscribeLive();
   setTimeout(checkSupplies, 1500); setInterval(checkSupplies, 3600000);
+  setTimeout(ensureCatalog, 2000);
   if (TZ && !homeCtx().tz) updateHome(h => h.tz ? h : ({ ...h, tz:TZ }));
   detectPush();
 }
