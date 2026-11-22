@@ -592,9 +592,11 @@ const monthLabel = m => { const [y, mo] = m.split("-").map(Number); return MONTH
 
 
 const TEMPLATES = [
-  ["Lavar las toallas",2],["Lavar las sábanas",2],["Poner un lavarropas",2],["Colgar la ropa",1],["Doblar la ropa",1],["Reponer el súper",2],["Limpiar el baño",3],
+  ["Lavar las toallas",2],["Lavar las sábanas",2],["Poner un lavarropas",2],["Colgar la ropa",1],["Doblar la ropa",1],["Reponer el súper",2],["Limpiar el baño",4],
   ["Sacar la basura",1],["Sacar a Vita",1],["Cocinar",2],["Lavar los platos",1],["Pasar la aspiradora",2],["Trapear",2],["Regar las plantas",1],["Bañar a Vita",3],["Cambiar las piedras de las gatas",2],["Darles de comer a las gatas",1],["Cambiar las sábanas",2]
 ];
+const EFFORT = ["Easy peasy","Tranqui","Normal","Me cuesta","Fiaca extrema"];
+const effortChips = (sel, attr = 'data-pick="pts"') => [1,2,3,4,5].map(p => `<button type="button" class="chip" ${attr} data-v="${p}" data-pts="${p}" aria-pressed="${sel===p}" title="${EFFORT[p-1]}"><span class="stars">${"★".repeat(p)}</span>${EFFORT[p-1]}</button>`).join("");
 const REPEATS = { none:"No se repite", weekly:"Cada semana", biweekly:"Cada 2 semanas", monthly:"Cada mes" };
 
 /* ============ conexión (Supabase) ============ */
@@ -800,8 +802,8 @@ function render(){
   $("#fab").hidden = false; $("#fab").innerHTML = ic("plus", 2.6);
   const tabs = [["inicio","Inicio","home"],["semana","Semana","week"],["habitos","Hábitos","leaf"],["super","Súper","cart"],["avisos","Avisos","bell"],["nosotros","Nosotros","us"]];
   $("#tabs").hidden = false;
-  $("#tabs").innerHTML = tabs.map(([k,l,i]) => `<button class="tab" data-act="go" data-v="${k}" ${ui.tab===k||(k==="nosotros"&&(ui.tab==="resumen"||ui.tab==="pet"))?'aria-current="page"':""}>${ic(i)}${l}</button>`).join("");
-  const V = { inicio:viewHome, semana:viewWeek, super:viewShop, avisos:viewReminders, nosotros:viewUs, resumen:viewSummary, habitos:viewHabits, pet:viewPet }[ui.tab] || viewHome;
+  $("#tabs").innerHTML = tabs.map(([k,l,i]) => `<button class="tab" data-act="go" data-v="${k}" ${ui.tab===k||(k==="nosotros"&&(ui.tab==="resumen"||ui.tab==="pet"))||(k==="semana"&&ui.tab==="tareas")?'aria-current="page"':""}>${ic(i)}${l}</button>`).join("");
+  const V = { inicio:viewHome, semana:viewWeek, super:viewShop, avisos:viewReminders, nosotros:viewUs, resumen:viewSummary, habitos:viewHabits, pet:viewPet, tareas:viewAllTasks }[ui.tab] || viewHome;
   $("#view").innerHTML = V();
   if (keep){ const el = document.getElementById(keep.id); if (el){ el.value = keep.v; el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch{} } }
   if (ui.daySheet){ const ds = document.querySelector("#layer .daysheet"); if (ds) ds.innerHTML = dayInner(ui.daySheet); else ui.daySheet = null; }
@@ -825,6 +827,7 @@ function taskCard(t, opts = {}){
   const late = t.day && t.day < todayS() && t.status !== "done";
   const own = ownerOf(t.title);
   const meta = [];
+  if (t.batch) meta.push(`<span class="pill">Paso ${t.batch.step}/${t.batch.total} · ${esc(t.batch.name)}</span>`);
   if (t.kind === "gestion") meta.push(`<span class="pill gest">Gestión</span>`);
   if (t.spontaneous) meta.push(`<span class="pill">Sin anotar</span>`);
   if (opts.showDay && t.day) meta.push(`<span>${dayLabel(t.day)}${t.day > addDays(todayS(),1) || t.day < addDays(todayS(),-1) ? " " + shortDay(t.day) : ""}</span>`);
@@ -911,7 +914,7 @@ function viewWeek(){
     </div>
     <div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-top:10px">
       <div class="seg"><button data-act="week-mode" data-v="quick" aria-pressed="${quick}">Vista rápida</button><button data-act="week-mode" data-v="detail" aria-pressed="${!quick}">Detalle</button></div>
-      <button class="btn sm ghost" data-act="sync">${ic("cal")}Google Calendar</button>
+      <div class="row"><button class="btn sm ghost" data-act="go" data-v="tareas">Todas las tareas</button><button class="btn sm ghost" data-act="sync" aria-label="Google Calendar">${ic("cal")}</button></div>
     </div>
     ${quick ? `<div class="qweek">${days.map(quickRow).join("")}</div>
       <p class="small muted" style="margin:8px 0 0">Tocá el día para ver todo, incluidas las rutinas. Tocá una tarea para cambiarla o moverla.</p>` : `
@@ -1032,15 +1035,16 @@ function taskSheet(id, presetDay){
     <div class="field"><span class="lbl">Tipo</span><div class="wrap-row">${Object.entries(KINDS).map(([k,v]) => `<button type="button" class="chip" data-pick="kind" data-v="${k}" aria-pressed="${draft.kind===k}">${v}</button>`).join("")}</div>
       <span class="small muted" id="kindHint">${KIND_HINT[draft.kind]}</span></div>
     <div class="field"><label for="tTitle">¿Qué hay que hacer?</label><input class="inp" id="tTitle" required maxlength="80" value="${esc(t.title)}" placeholder="${draft.kind==="gestion"?"Pedir turno al veterinario":"Lavar sábanas"}">
-      ${!id ? `<div class="wrap-row" id="tplRow">${tplChips(draft.kind)}</div>` : ""}</div>
+      ${!id ? `<div class="wrap-row" id="tplRow">${tplChips(draft.kind)}</div>
+      <div class="wrap-row" style="align-items:center"><span class="small muted">O en pasos:</span>${BATCHES.map((b, i) => `<button type="button" class="chip" data-batch="${i}">${esc(b[0])} · ${b[1].length} pasos</button>`).join("")}<button type="button" class="chip" data-batch="new">+ Armar tanda</button></div>` : ""}</div>
     <div class="field"><span class="lbl">¿Quién la hace?</span><div class="wrap-row">
       ${KEYS.map(k => `<button type="button" class="chip" data-pick="who" data-v="${k}" aria-pressed="${whoPressed(draft.assignees)(k)}">${charSVG(prof(k))}${esc(prof(k).name)}</button>`).join("")}
       <button type="button" class="chip" data-pick="who" data-v="both" aria-pressed="${draft.assignees.length===2}">Los dos</button>
       <button type="button" class="chip" data-pick="who" data-v="none" aria-pressed="${draft.assignees.length===0}">Después vemos</button></div></div>
     <div class="field"><span class="lbl">¿Cuándo?</span><div class="wrap-row">${dayChoices(draft.day)}</div><span class="hint" id="dayHint"></span></div>
     <div class="field"><label for="tTime">Horario (opcional)</label><input class="inp" type="time" id="tTime" value="${esc(t.time||"")}" style="max-width:160px"></div>
-    <div class="field"><span class="lbl">¿Cuánto esfuerzo? (estrellitas que da)</span><div class="wrap-row">
-      ${[1,2,3].map(p => `<button type="button" class="chip" data-pick="pts" data-v="${p}" aria-pressed="${draft.points===p}"><span class="stars">${"★".repeat(p)}</span>${["Rapidito","Normal","Pesada"][p-1]}</button>`).join("")}</div></div>
+    <div class="field"><span class="lbl">¿Cuánto esfuerzo? (son las estrellitas que da)</span><div class="wrap-row">
+      ${effortChips(draft.points)}</div></div>
     <div class="field"><label for="tRepeat">Repetir</label><select class="inp" id="tRepeat">${Object.entries(REPEATS).map(([k,v]) => `<option value="${k}" ${(t.repeat||"none")===k?"selected":""}>${v}</option>`).join("")}</select></div>
     <div class="field"><div class="row"><button type="button" class="switch" role="switch" id="tCal" aria-checked="${draft.cal}" aria-label="Mostrar en Google Calendar"></button><span><b>En Google Calendar</b><span class="small muted" style="display:block">Para lo importante: veterinario, turnos, compras grandes.</span></span></div></div>
     <div class="field"><span class="lbl">Dueño de esta tarea</span><div class="wrap-row">
@@ -1073,6 +1077,7 @@ function taskSheet(id, presetDay){
     $("#tTitle").addEventListener("change", () => { applyOwner(); autoCal(); });
     sheet.addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.batch != null){ const pd = draft.day; closeSheet(); batchSheet(b.dataset.batch === "new" ? null : BATCHES[+b.dataset.batch], pd); return; }
       if (b.id === "tCal"){ calTouched = true; draft.cal = !draft.cal; b.setAttribute("aria-checked", draft.cal); return; }
       if (b.dataset.tpl){ $("#tTitle").value = b.dataset.tpl; draft.points = +b.dataset.p; syncPressed(sheet, "pts", v => +v === draft.points); applyOwner(); autoCal(); return; }
       if (b.dataset.pick){
@@ -1246,7 +1251,7 @@ function quickDoneSheet(){
     <div class="field"><span class="lbl">Tipo</span><div class="wrap-row">${Object.entries(KINDS).map(([k,v]) => `<button type="button" class="chip" data-pick="kind" data-v="${k}" aria-pressed="${k==="hogar"}">${v}</button>`).join("")}</div></div>
     <div class="field"><label for="qTitle">¿Qué hiciste?</label><input class="inp" id="qTitle" required maxlength="80" placeholder="Desatascar la pileta"><div class="wrap-row" id="qTpl">${tplChips("hogar")}</div></div>
     <div class="field"><span class="lbl">¿Quién lo hizo?</span><div class="wrap-row">${KEYS.map(k => `<button type="button" class="chip" data-pick="who" data-v="${k}" aria-pressed="${k===me}">${charSVG(prof(k))}${esc(prof(k).name)}</button>`).join("")}<button type="button" class="chip" data-pick="who" data-v="both" aria-pressed="false">Los dos</button></div></div>
-    <div class="field"><span class="lbl">¿Cuánto esfuerzo?</span><div class="wrap-row">${[1,2,3].map(p => `<button type="button" class="chip" data-pick="pts" data-v="${p}" aria-pressed="${p===1}"><span class="stars">${"★".repeat(p)}</span>${["Rapidito","Normal","Pesada"][p-1]}</button>`).join("")}</div></div>
+    <div class="field"><span class="lbl">¿Cuánto esfuerzo?</span><div class="wrap-row">${effortChips(1)}</div></div>
     <div class="sheet-foot"><span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Sumar estrellitas</button></div></form>`, sheet => {
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.tpl){ $("#qTitle").value = b.dataset.tpl; d.points = +b.dataset.p; syncPressed(sheet, "pts", v => +v === d.points); return; }
@@ -1761,7 +1766,7 @@ function quickRow(d){
     else if (isOffice(k, d)) tags.push(`<span class="tag" style="--c:${c}">${n} · ofi</span>`);
   }
   const chip = x => { const as = x.assignees || [], c = as.length === 1 ? prof(as[0]).color : as.length === 2 ? "#B58AE8" : "#C9C2D6";
-    return `<button class="qchip ${x.status === "done" ? "done" : ""} ${x.day < t && x.status !== "done" ? "late" : ""}" style="--c:${c}" data-act="edit-task" data-v="${x.id}" draggable="true" data-drag="${x.id}"><i></i><span>${esc(x.title)}${x.time ? ` · ${x.time}` : ""}</span></button>`; };
+    return `<button class="qchip ${x.status === "done" ? "done" : ""} ${x.day < t && x.status !== "done" ? "late" : ""}" style="--c:${c}" data-act="edit-task" data-v="${x.id}" draggable="true" data-drag="${x.id}"><i></i><span>${x.batch ? `${x.batch.step}/${x.batch.total} ` : ""}${esc(x.title)}${x.time ? ` · ${x.time}` : ""}</span></button>`; };
   return `<div class="qrow ${d === t ? "today" : ""}" data-drop="${d}">
     <button class="qday" data-act="day-open" data-v="${d}" aria-label="Ver ${DAYS[dow(d)]}"><b>${d === t ? "Hoy" : DAYS_S[dow(d)]}</b><span>${shortDay(d)}</span></button>
     <div class="qbody">${list.length ? `<div class="qchips">${list.map(chip).join("")}</div>` : `<div class="qfree">Libre</div>`}
@@ -1807,7 +1812,7 @@ function routineSheet(id){
     <div class="field"><span class="lbl">¿Quién?</span><div class="wrap-row">${KEYS.map(k => `<button type="button" class="chip" data-who="${k}" aria-pressed="${d.who.includes(k)}">${charSVG(prof(k))}${esc(prof(k).name)}</button>`).join("")}</div></div>
     <div class="field"><span class="lbl">Días</span><div class="wrap-row">${DAYS_S.map((n,i) => `<button type="button" class="chip" data-day="${i}" aria-pressed="${d.days.includes(i)}">${n}</button>`).join("")}</div></div>
     <div class="field"><span class="lbl">Momento</span><div class="wrap-row">${Object.entries(SLOTS).map(([k,v]) => `<button type="button" class="chip" data-slot="${k}" aria-pressed="${d.slot===k}">${v}</button>`).join("")}</div></div>
-    <div class="field"><span class="lbl">Estrellitas si la marcás</span><div class="wrap-row">${[1,2,3].map(p => `<button type="button" class="chip" data-pts="${p}" aria-pressed="${d.points===p}"><span class="stars">${"★".repeat(p)}</span></button>`).join("")}</div></div>
+    <div class="field"><span class="lbl">¿Cuánto esfuerzo?</span><div class="wrap-row">${effortChips(d.points, "")}</div></div>
     <div class="sheet-foot">${id ? `<button type="button" class="btn danger" data-del="1">Borrar</button>` : ""}<span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.who){ const k = b.dataset.who; d.who = d.who.includes(k) ? d.who.filter(x => x !== k) : [...d.who, k]; b.setAttribute("aria-pressed", d.who.includes(k)); }
@@ -2055,7 +2060,7 @@ function careSheet(id, preset){
     <div class="field"><label for="cLabel">¿Qué es?</label><input class="inp" id="cLabel" required maxlength="50" value="${esc(c.label)}" placeholder="Pipeta"></div>
     <div class="field"><label for="cEvery">¿Cada cuánto?</label><select class="inp" id="cEvery" style="max-width:220px">${EVERY.map(([n, l]) => `<option value="${n}" ${+c.every === n ? "selected" : ""}>Cada ${l}</option>`).join("")}${EVERY.some(e => e[0] === +c.every) ? "" : `<option value="${c.every}" selected>Cada ${c.every} días</option>`}</select></div>
     <div class="field"><label for="cLast">¿Cuándo fue la última vez?</label><input class="inp" type="date" id="cLast" value="${esc(c.last || "")}" max="${todayS()}" style="max-width:200px"><span class="small muted">Si no te acordás, dejalo vacío y tocá “Hecho” la próxima vez.</span></div>
-    <div class="field"><span class="lbl">Estrellitas al hacerlo</span><div class="wrap-row">${[1,2,3].map(p => `<button type="button" class="chip" data-pts="${p}" aria-pressed="${(c.points || 1) === p}"><span class="stars">${"★".repeat(p)}</span></button>`).join("")}</div></div>
+    <div class="field"><span class="lbl">¿Cuánto esfuerzo?</span><div class="wrap-row">${effortChips(c.points || 1, "")}</div></div>
     <div class="sheet-foot">${id ? `<button type="button" class="btn danger" data-del="1">Borrar</button>` : ""}<span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
     let pts = c.points || 1;
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
@@ -2144,6 +2149,80 @@ function petEditSheet(k){
   });
 }
 
+/* ============ tandas (tareas en pasos) ============ */
+const BATCHES = [
+  ["Lavar ropa", [["Poner un lavarropas",2],["Colgar la ropa",2],["Doblar y guardar la ropa",3]]],
+  ["Sábanas", [["Sacar las sábanas",1],["Lavar las sábanas",2],["Colgar las sábanas",2],["Hacer la cama",2]]],
+  ["Compras grandes", [["Armar la lista del súper",1,"gestion"],["Hacer las compras",3],["Guardar las compras",2]]],
+  ["Limpieza a fondo", [["Pasar la aspiradora",3],["Trapear",3],["Limpiar el baño",4]]],
+];
+function batchSheet(preset, presetDay){
+  const steps = (preset ? preset[1] : [["",2],["",2]]).map(([title, points, kind]) => ({ title, points, kind:kind || "hogar", who:[me] }));
+  let day = presetDay ?? todayS();
+  const whoBtns = (st, i) => [...KEYS.map(k => [k, prof(k).name]), ["both","Los dos"]].map(([v, l]) => {
+    const on = v === "both" ? st.who.length === 2 : st.who.length === 1 && st.who[0] === v;
+    return `<button type="button" class="chip" style="padding:4px 9px;font-size:12.5px" data-sw="${i}" data-v="${v}" aria-pressed="${on}">${esc(l)}</button>`; }).join("");
+  const stepsHTML = () => steps.map((st, i) => `<div class="card" style="display:flex;flex-direction:column;gap:8px;padding:12px">
+      <div class="row"><span class="pill tnum">${i + 1}</span><input class="inp" data-st="${i}" maxlength="60" value="${esc(st.title)}" placeholder="Paso ${i + 1}" style="padding:9px 12px">${steps.length > 2 ? `<button type="button" class="x" data-rm="${i}" aria-label="Quitar paso">${ic("x",2.4)}</button>` : ""}</div>
+      <div class="wrap-row">${whoBtns(st, i)}<select class="inp" data-sp="${i}" style="width:auto;padding:5px 8px;font-size:13px" aria-label="Esfuerzo">${EFFORT.map((l, j) => `<option value="${j + 1}" ${st.points === j + 1 ? "selected" : ""}>${"★".repeat(j + 1)} ${l}</option>`).join("")}</select></div></div>`).join("");
+  openSheet(`<form style="display:contents"><h2>${preset ? `Tanda: ${esc(preset[0])}` : "Armar una tanda"}</h2>
+    <p class="small muted" style="margin:0">Una tarea en pasos. Cuando alguien termina uno, Nido pregunta quién sigue.</p>
+    <div class="field"><label for="bName">Nombre de la tanda</label><input class="inp" id="bName" maxlength="40" required value="${esc(preset ? preset[0] : "")}" placeholder="Lavar ropa"></div>
+    <div class="field"><span class="lbl">Pasos</span><div id="bSteps" style="display:flex;flex-direction:column;gap:8px">${stepsHTML()}</div>
+      <button type="button" class="add-day" data-add="1">+ Agregar paso</button></div>
+    <div class="field"><span class="lbl">¿Cuándo?</span><div class="wrap-row">${dayChoices(day)}</div></div>
+    <div class="sheet-foot"><span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Crear tanda</button></div></form>`, sheet => {
+    const redraw = () => { sheet.querySelector("#bSteps").innerHTML = stepsHTML(); };
+    sheet.addEventListener("input", e => { const i = e.target.dataset.st; if (i != null) steps[+i].title = e.target.value; });
+    sheet.addEventListener("change", e => { const i = e.target.dataset.sp; if (i != null) steps[+i].points = +e.target.value; });
+    sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.sw != null){ const st = steps[+b.dataset.sw], v = b.dataset.v; st.who = v === "both" ? [...KEYS] : [v]; redraw(); }
+      if (b.dataset.rm != null){ steps.splice(+b.dataset.rm, 1); redraw(); }
+      if (b.dataset.add){ steps.push({ title:"", points:2, kind:"hogar", who:[me] }); redraw(); sheet.querySelector(`[data-st="${steps.length - 1}"]`)?.focus(); }
+      if (b.dataset.pick === "day"){ day = b.dataset.v; sheet.querySelectorAll("[data-pick=day]").forEach(x => x.setAttribute("aria-pressed", x === b)); }
+      if (b.dataset.close) closeSheet(); });
+    sheet.querySelector("form").addEventListener("submit", e => { e.preventDefault();
+      const name = $("#bName").value.trim(), list = steps.filter(s => s.title.trim());
+      if (!name || list.length < 2){ toast("Poné un nombre y al menos dos pasos."); return; }
+      const bid = uid8(), base = Date.now();
+      list.forEach((st, i) => put("tasks", uid8(), { title:st.title.trim(), kind:st.kind, assignees:st.who, day:day || null, time:null, points:st.points, repeat:"none", status:"todo",
+        batch:{ id:bid, name, step:i + 1, total:list.length }, createdAt:nowLocal(new Date(base + i * 1000)), createdBy:me }));
+      closeSheet(); toast(`Tanda “${name}” creada: ${list.length} pasos`); });
+  });
+}
+function nextStepSheet(n, prev){
+  const o = other(me);
+  openSheet(`<h2>¡Paso ${prev.batch.step} listo!</h2>
+    <p style="margin:0">Sigue <b>${esc(n.title)}</b> · ${esc(n.batch.name)}, paso ${n.batch.step} de ${n.batch.total}.</p>
+    <div class="wrap-row"><button class="btn pri" data-ns="me">Me lo quedo para hoy</button><button class="btn" data-ns="other">Para ${esc(prof(o).name)}, hoy</button><button class="btn ghost" data-ns="keep">Dejarlo como está</button></div>`, sheet => {
+    sheet.addEventListener("click", e => { const b = e.target.closest("[data-ns]"); if (!b) return;
+      if (b.dataset.ns === "me"){ patch("tasks", n.id, { assignees:[me], day:todayS() }); toast(`“${n.title}” es tuya para hoy`); }
+      if (b.dataset.ns === "other"){ patch("tasks", n.id, { assignees:[o], day:todayS() }); notify([o], `${prof(me).name} terminó “${prev.title}”. Te toca: ${n.title} 🧺`); toast(`Le avisamos a ${prof(o).name}`); }
+      closeSheet(); });
+  });
+}
+
+/* ============ todas las tareas ============ */
+function viewAllTasks(){
+  const f = ui.tf || "pend", w = ui.tw || "all", q = norm(ui.tq || ""), t = todayS();
+  const match = x => (w === "all" || (x.assignees || []).includes(w) || (x.doneBy || []).includes(w)) && (!q || norm(x.title).includes(q) || norm(x.batch?.name || "").includes(q));
+  const base = tasks().filter(x => !x.routine).filter(match);
+  let list = [], groups = null;
+  if (f === "pend"){ list = base.filter(x => x.day && x.status !== "done").sort((a,b) => a.day.localeCompare(b.day) || sortTasks(a,b));
+    groups = {}; list.forEach(x => { (groups[x.day] ||= []).push(x); }); }
+  else if (f === "cola") list = base.filter(x => !x.day && x.status !== "done").sort(sortTasks);
+  else if (f === "rep") list = base.filter(x => x.status !== "done" && ((x.repeat && x.repeat !== "none") || x.batch)).sort((a,b) => (a.day || "9").localeCompare(b.day || "9"));
+  else list = base.filter(x => x.status === "done" && x.doneAt >= addDays(t, -60)).sort((a,b) => b.doneAt.localeCompare(a.doneAt));
+  const counts = { pend: tasks().filter(x => !x.routine && x.day && x.status !== "done").length, cola: tasks().filter(x => !x.day && x.status !== "done").length };
+  return `<div class="row" style="margin-top:8px"><button class="icon-btn" data-act="go" data-v="semana" aria-label="Volver">${ic("left")}</button><h2 style="font-size:22px">Todas las tareas</h2></div>
+    <section class="sec"><input class="inp" id="taskSearch" placeholder="Buscar una tarea" value="${esc(ui.tq || "")}" autocomplete="off">
+      <div class="seg" style="flex-wrap:wrap">${[["pend",`Agendadas (${counts.pend})`],["cola",`En la cola (${counts.cola})`],["rep","Repetidas y tandas"],["done","Hechas"]].map(([k,l]) => `<button data-act="tf" data-v="${k}" aria-pressed="${f===k}">${l}</button>`).join("")}</div>
+      <div class="wrap-row">${[["all","Los dos"], ...KEYS.map(k => [k, prof(k).name])].map(([k,l]) => `<button class="chip" data-act="tw" data-v="${k}" aria-pressed="${w===k}">${esc(l)}</button>`).join("")}</div></section>
+    <section class="sec">${!list.length ? `<div class="empty">No hay tareas acá${q ? " con esa búsqueda" : ""}.</div>` :
+      groups ? Object.entries(groups).map(([d, xs]) => `<div class="eyebrow" style="margin-top:6px">${dayLabel(d)} ${shortDay(d)}</div><div class="tasks">${xs.map(x => taskCard(x)).join("")}</div>`).join("") :
+      `<div class="tasks">${list.map(x => taskCard(x, { showDay:true })).join("")}</div>`}</section>`;
+}
+
 /* ============ súper: copiar y pegar ============ */
 const splitList = t => String(t || "").split(/\r?\n|,|;/).map(x => x.replace(/^[\s•\-*·–]+|^\d+[.)]\s*/g, "").trim()).filter(Boolean);
 function addShopItem(name){
@@ -2189,6 +2268,7 @@ function completeTask(id, by, x, y){
   put("tasks", id, data);
   burst(x, y);
   toast(`+${t.points||1} ⭐ para ${by.map(k => prof(k).name).join(" y ")}`);
+  if (t.batch){ const nx = tasks().find(x => x.batch?.id === t.batch.id && x.batch.step === t.batch.step + 1 && x.status !== "done"); if (nx) setTimeout(() => nextStepSheet(nx, t), 600); }
 }
 function toggleTask(id, x, y){
   const t = store.tasks[id]; if (!t) return;
@@ -2258,7 +2338,7 @@ document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]"); if (!el) return;
   const a = el.dataset.act, v = el.dataset.v;
   if (a === "close-sheet"){ if (e.target === el) closeSheet(); return; }
-  if (readOnly && !["go","close-sheet","wk","sync","month","go-summary","replay-thx","shop-copy","mood-peek","copy","logout","push-on","week-mode","day-open","habit-view","hnav","pet-open","copy-text","sync-retry"].includes(a) && me){ toast("Este nido está en modo lectura."); return; }
+  if (readOnly && !["go","close-sheet","wk","sync","month","go-summary","replay-thx","shop-copy","mood-peek","copy","logout","push-on","week-mode","day-open","habit-view","hnav","pet-open","copy-text","sync-retry","tf","tw"].includes(a) && me){ toast("Este nido está en modo lectura."); return; }
   switch (a){
     case "go": ui.tab = v; render(); window.scrollTo({ top:0 }); break;
     case "claim": claim(v); break;
@@ -2296,6 +2376,8 @@ document.addEventListener("click", e => {
     case "go-summary": ui.tab = "resumen"; ui.month = v; render(); window.scrollTo({ top:0 }); break;
     case "month": { const [y, mo] = ui.month.split("-").map(Number); ui.month = ymd(new Date(y, mo - 1 + (+v), 1)).slice(0,7); render(); break; }
     case "letter": writeLetter(); break;
+    case "tf": ui.tf = v; render(); break;
+    case "tw": ui.tw = v; render(); break;
     case "sync-retry": ui.saveErr = null; flushOutbox(); break;
     case "pet-open": closeSheet(); ui.tab = "pet"; ui.pet = v; render(); window.scrollTo({ top:0 }); break;
     case "care-new": careSheet(null, { pet:v }); break;
@@ -2350,6 +2432,7 @@ document.addEventListener("submit", e => {
   }
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+document.addEventListener("input", e => { if (e.target.id === "taskSearch"){ ui.tq = e.target.value; render(); } });
 // drag & drop (desktop)
 document.addEventListener("dragstart", e => { const c = e.target.closest?.("[data-drag]"); if (c){ e.dataTransfer.setData("text/plain", c.dataset.drag); e.dataTransfer.effectAllowed = "move"; } });
 document.addEventListener("dragover", e => { const z = e.target.closest?.("[data-drop]"); if (z){ e.preventDefault(); document.querySelectorAll(".day.over").forEach(x => x !== z && x.classList.remove("over")); z.classList.add("over"); } });
