@@ -883,9 +883,9 @@ function taskCard(t, opts = {}){
 function viewHome(){
   const t = todayS(), P = prof(me), o = other(me), ws = weekStart(t), we = addDays(ws, 6);
   const a = pointsBy("pau", ws, we), b = pointsBy("fede", ws, we), tot = a + b, pa = tot ? Math.round(a / tot * 100) : 50;
-  const mine = tasksOn(t).filter(x => (x.assignees || []).includes(me) && !x.routine);
+  const mine = tasksOn(t).filter(x => !x.routine && ((x.assignees || []).includes(me) || !(x.assignees || []).length));
   const late = tasks().filter(x => x.day && x.day < t && x.status !== "done" && ((x.assignees || []).includes(me) || !(x.assignees || []).length)).sort((x, y) => x.day.localeCompare(y.day));
-  const theirs = tasksOn(t).filter(x => !(x.assignees || []).includes(me) && !x.routine);
+  const theirs = tasksOn(t).filter(x => !x.routine && (x.assignees || []).includes(o) && !(x.assignees || []).includes(me));
   const theirsLeft = theirs.filter(x => x.status !== "done").length;
   const list = [...late, ...mine];
   const hr = new Date().getHours(), greet = hr < 6 ? "Buenas noches" : hr < 13 ? "Buen día" : hr < 20 ? "Buenas tardes" : "Buenas noches";
@@ -916,7 +916,7 @@ function viewHome(){
     <section class="sec"><div class="sec-h"><h2>Hoy</h2><button class="btn sm ghost" data-act="new-task" data-day="${t}">${ic("plus")}Agregar</button></div>
       ${list.length ? `<div class="tasks">${list.map(x => taskCard(x, { showDay: x.day < t })).join("")}</div>` : `<div class="empty">Nada para vos hoy.</div>`}
       <button class="add-day" data-act="quick-done">+ Hice algo sin anotar</button>
-      ${theirs.length ? `<details class="theirs"><summary>${esc(prof(o).name)} ${theirsLeft ? `tiene ${theirsLeft} ${theirsLeft === 1 ? "tarea" : "tareas"} hoy` : "ya hizo todo lo de hoy"}</summary><div class="tasks" style="margin-top:8px">${theirs.map(x => taskCard(x)).join("")}</div></details>` : ""}
+      ${theirs.length ? `<details class="theirs"><summary>${theirsLeft ? `${esc(prof(o).name)} tiene ${theirsLeft} ${theirsLeft === 1 ? "tarea pendiente" : "tareas pendientes"} hoy` : `Lo de ${esc(prof(o).name)} para hoy ya está hecho`}</summary><div class="tasks" style="margin-top:8px">${theirs.map(x => taskCard(x)).join("")}</div></details>` : ""}
     </section>
   </div><div>
     ${notes.length ? `<section class="sec"><div class="sec-h"><h2>Para tener en cuenta</h2></div><div class="card" style="padding:4px 14px">${notes.slice(0, 4).join("")}</div></section>` : ""}
