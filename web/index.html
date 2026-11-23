@@ -384,6 +384,13 @@ textarea.inp{min-height:110px;resize:vertical}
 .pill.soon{background:color-mix(in srgb,var(--sky) 25%,transparent);color:var(--ink)}
 .fam-card .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
 @media (max-width:420px){.pet-hero{grid-template-columns:90px 1fr}.pet-hero svg.fam{width:90px;height:90px}}
+.navgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:900px){.navgrid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.navc{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:18px;text-align:left;background:color-mix(in srgb,var(--c) 22%,var(--paper));box-shadow:var(--shadow);min-width:0}
+.navc svg{width:42px;height:42px;flex:none}
+.navc b{display:block;font-size:14.5px}
+.navc span{display:block;font-size:12px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button.stk{font:inherit;color:inherit}
 @media (min-width:900px){.home-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:start}}
 </style>
 </head>
@@ -802,8 +809,8 @@ function render(){
   $("#fab").hidden = false; $("#fab").innerHTML = ic("plus", 2.6);
   const tabs = [["inicio","Inicio","home"],["semana","Semana","week"],["habitos","Hábitos","leaf"],["super","Súper","cart"],["nosotros","Nosotros","us"]];
   $("#tabs").hidden = false;
-  $("#tabs").innerHTML = tabs.map(([k,l,i]) => `<button class="tab" data-act="go" data-v="${k}" ${ui.tab===k||(k==="nosotros"&&["resumen","pet","avisos","premios"].includes(ui.tab))||(k==="semana"&&ui.tab==="tareas")?'aria-current="page"':""}>${ic(i)}${l}</button>`).join("");
-  const V = { inicio:viewHome, semana:viewWeek, super:viewShop, avisos:viewReminders, nosotros:viewUs, resumen:viewSummary, habitos:viewHabits, pet:viewPet, tareas:viewAllTasks, premios:viewRewards }[ui.tab] || viewHome;
+  $("#tabs").innerHTML = tabs.map(([k,l,i]) => `<button class="tab" data-act="go" data-v="${k}" ${ui.tab===k||(k==="nosotros"&&["resumen","pet","avisos","premios","casa"].includes(ui.tab))||(k==="semana"&&ui.tab==="tareas")?'aria-current="page"':""}>${ic(i)}${l}</button>`).join("");
+  const V = { inicio:viewHome, semana:viewWeek, super:viewShop, avisos:viewReminders, nosotros:viewUs, resumen:viewSummary, habitos:viewHabits, pet:viewPet, tareas:viewAllTasks, premios:viewRewards, casa:viewHouse }[ui.tab] || viewHome;
   $("#view").innerHTML = V();
   if (keep){ const el = document.getElementById(keep.id); if (el){ el.value = keep.v; el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch{} } }
   if (ui.daySheet){ const ds = document.querySelector("#layer .daysheet"); if (ds) ds.innerHTML = dayInner(ui.daySheet); else ui.daySheet = null; }
@@ -883,17 +890,17 @@ function viewHome(){
     ${late.length ? `<section class="sec"><div class="sec-h"><h2>Quedaron pendientes</h2></div><div class="tasks">${late.map(x => taskCard(x, {showDay:true})).join("")}</div></section>` : ""}
 
     <section class="sec"><div class="sec-h"><h2>Tus tareas de hoy</h2><button class="btn sm ghost" data-act="new-task" data-day="${t}">${ic("plus")}Agregar</button></div>
-      ${mine.length ? `<div class="tasks">${mine.map(x => taskCard(x)).join("")}</div>` : `<div class="empty">Nada para vos hoy. Podés sacar algo de la cola en la pestaña Semana.</div>`}
+      ${mine.length ? `<div class="tasks">${mine.map(x => taskCard(x)).join("")}</div>` : `<div class="empty">Nada para vos hoy.</div>`}
     </section>
     ${rest.length ? `<section class="sec"><div class="sec-h"><h2>Lo que hace ${esc(prof(other(me)).name)} hoy</h2></div><div class="tasks">${rest.map(x => taskCard(x)).join("")}</div></section>` : ""}
   </div><div>
-    ${(() => { const dn = parse(t).getDate(), cur = t.slice(0,7), pm = (() => { const d = parse(t); d.setDate(1); d.setMonth(d.getMonth()-1); return ymd(d).slice(0,7); })(); const mm = dn <= 5 ? pm : cur;
+    ${(() => { const dn = parse(t).getDate(), cur = t.slice(0,7), pm = (() => { const d = parse(t); d.setDate(1); d.setMonth(d.getMonth()-1); return ymd(d).slice(0,7); })(); const mm = dn <= 5 ? pm : cur; if (dn > 5) return "";
       return `<section class="sec"><button class="month-banner" data-act="go-summary" data-v="${mm}">${stickerSVG("scallop", "#EF8BB3", charSVG({ char:"star", color:"#F6C445", face:"happy" }))}<div><div class="eyebrow">Resumen mensual</div><b>${dn <= 5 ? `Ya está el resumen de ${monthLabel(pm)}` : `Así viene su ${monthLabel(cur)}`}</b></div></button></section>`; })()}
     ${nr ? `<section class="sec"><div class="next-rem" data-act="go" data-v="avisos" style="cursor:pointer">${charSVG({char:"dog",color:"#C08A5B",face:"happy"})}<div><div class="eyebrow">Próximo aviso · ${nr.off===0?"hoy":nr.off===1?"mañana":DAYS[(new Date().getDay()+6+nr.off)%7].toLowerCase()} ${esc(nr.r.time)} hs</div><div style="font-weight:600">${esc(nr.r.text)}</div></div></div></section>` : ""}
     ${petHomeHTML()}
     <section class="sec"><div class="sec-h"><h2>Hábitos de hoy</h2><button class="btn sm ghost" data-act="go" data-v="habitos">Ver semana</button></div>${habitChips()}</section>
     <section class="sec"><div class="sec-h"><h2>Ideas para la semana</h2></div>
-      ${sug.length ? sug.map(s => `<div class="sugg">${charSVG(prof(s.who||me))}<div><p>${esc(s.text)}</p>${s.act ? `<button class="btn sm pri" data-act="apply" data-v='${esc(JSON.stringify(s.act))}'>${esc(s.label)}</button>` : ""}</div></div>`).join("") : `<div class="empty">Todo equilibrado por ahora. Si un día se carga mucho, te aviso acá.</div>`}
+      ${sug.length ? sug.map(s => `<div class="sugg">${charSVG(prof(s.who||me))}<div><p>${esc(s.text)}</p>${s.act ? `<button class="btn sm pri" data-act="apply" data-v='${esc(JSON.stringify(s.act))}'>${esc(s.label)}</button>` : ""}</div></div>`).join("") : `<div class="empty">Todo equilibrado.</div>`}
       ${aiBlock()}
     </section>
   </div></div>`;
@@ -916,9 +923,7 @@ function viewWeek(){
       <div class="seg"><button data-act="week-mode" data-v="quick" aria-pressed="${quick}">Vista rápida</button><button data-act="week-mode" data-v="detail" aria-pressed="${!quick}">Detalle</button></div>
       <div class="row"><button class="btn sm ghost" data-act="go" data-v="tareas">Todas las tareas</button><button class="btn sm ghost" data-act="sync" aria-label="Google Calendar">${ic("cal")}</button></div>
     </div>
-    ${quick ? `<div class="qweek">${days.map(quickRow).join("")}</div>
-      <p class="small muted" style="margin:8px 0 0">Tocá el día para ver todo, incluidas las rutinas. Tocá una tarea para cambiarla o moverla.</p>` : `
-    <p class="small muted" style="margin:8px 0 0">Tocá una tarea para cambiarla o moverla. En compu podés arrastrarla a otro día o a la cola.</p>
+    ${quick ? `<div class="qweek">${days.map(quickRow).join("")}</div>` : `
     <div class="days">${days.map(d => {
       const list = tasksOn(d).filter(x => !x.routine);
       return `<section class="day ${d===t?"today":""}" data-drop="${d}">
@@ -930,7 +935,7 @@ function viewWeek(){
       </section>`;}).join("")}</div>`}
     <section class="sec queue day" data-drop="queue" style="background:transparent">
       <div class="sec-h"><h2>En la cola</h2><span class="muted small">${queue.length} ${queue.length===1?"tarea":"tareas"} para más adelante</span></div>
-      ${queue.length ? `<div class="tasks">${queue.map(x => taskCard(x)).join("")}</div>` : `<div class="empty">La cola está vacía. Cuando anotes algo sin fecha, queda acá esperando.</div>`}
+      ${queue.length ? `<div class="tasks">${queue.map(x => taskCard(x)).join("")}</div>` : `<div class="empty">La cola está vacía.</div>`}
       <button class="add-day" data-act="new-task" data-day="">+ Anotar para más adelante</button>
     </section>
     ${routinesSection()}`;
@@ -950,10 +955,9 @@ function viewShop(){
     ${shopTopHTML(need)}
     <form class="shop-add" data-form="shop"><input class="inp" id="shopInput" placeholder="¿Qué se está terminando? (podés pegar una lista)" autocomplete="off" maxlength="80"><button class="btn pri" type="submit">Anotar</button></form>
     ${freq.length ? `<div class="wrap-row">${freq.map(i => `<button class="chip" data-act="shop-readd" data-v="${i.id}">+ ${esc(i.name)}</button>`).join("")}</div>` : ""}
-    ${need.length ? `<div class="items">${need.map(row).join("")}</div>` : `<div class="empty">No falta nada. Cuando veas que algo se termina, anotalo acá y le llega al otro.</div>`}
+    ${need.length ? `<div class="items">${need.map(row).join("")}</div>` : `<div class="empty">No falta nada.</div>`}
     </section>
-    ${got.length ? `<section class="sec"><div class="sec-h"><h2>En el changuito</h2><button class="btn sm ghost" data-act="shop-clear">Terminar compra</button></div><div class="items">${got.map(row).join("")}</div>
-      <p class="small muted">“Terminar compra” limpia lo comprado y lo guarda en tus frecuentes para volver a anotarlo con un toque.</p></section>` : ""}`;
+    ${got.length ? `<section class="sec"><div class="sec-h"><h2>En el changuito</h2><button class="btn sm ghost" data-act="shop-clear">Terminar compra</button></div><div class="items">${got.map(row).join("")}</div></section>` : ""}`;
 }
 
 function viewReminders(){
@@ -966,32 +970,32 @@ function viewReminders(){
         <div class="tx"><p>${esc(r.text)}</p><div class="small muted">${(r.days||[]).length===7?"Todos los días":(r.days||[]).map(d => DAYS_S[d]).join(" · ")} · para ${(r.who||[]).map(k => esc(prof(k).name)).join(" y ")}</div>
           <div class="wrap-row" style="margin-top:8px"><a class="btn sm ghost" href="${gcalReminderUrl(r)}" target="_blank" rel="noopener">${ic("cal")}También en Google Calendar</a><button class="btn sm ghost" data-act="edit-rem" data-v="${r.id}">Editar</button></div></div>
         <button class="switch" role="switch" aria-checked="${!!r.active}" aria-label="Activo" data-act="rem-toggle" data-v="${r.id}"></button>
-      </div>`).join("") : `<div class="empty">Sin avisos todavía. Por ejemplo: a las 18 hs, “¿Salís al gimnasio? Sacá la basura así Vita no la come”.</div>`}
+      </div>`).join("") : `<div class="empty">Sin avisos todavía.</div>`}
   </section>`;
 }
 
 function viewUs(){
-  const ctx = homeCtx();
-  const t = todayS(), from = addDays(t, -29);
-  const nRem = Object.values(store.reminders).filter(r => r.active).length;
-  return `${inviteCard()}<section class="sec"><div class="row" style="gap:10px;flex-wrap:wrap">
-      <button class="month-banner" data-act="go" data-v="premios" style="flex:1;min-width:200px;background:color-mix(in srgb,var(--sun) 28%,var(--paper))">${stickerSVG("star", "#F6C445", charSVG({ char:"heart", color:"#F0644B", face:"happy" }))}<div><div class="eyebrow">Premios</div><b>Tenés ${starBalance(me)}⭐ para canjear</b></div></button>
-      <button class="month-banner" data-act="go" data-v="avisos" style="flex:1;min-width:200px;background:color-mix(in srgb,var(--teal) 18%,var(--paper))">${stickerSVG("scallop", "#3BBDAE", charSVG({ char:"dog", color:"#C08A5B", face:"happy" }))}<div><div class="eyebrow">Avisos</div><b>${nRem} ${nRem === 1 ? "aviso activo" : "avisos activos"}${ui.pushState === "on" ? "" : " · activá las notificaciones"}</b></div></button>
+  const nRem = Object.values(store.reminders).filter(r => r.active).length, ak = ui.albumOf || me, st = stickersFor(ak);
+  const nav = (v, c, svg, title, sub) => `<button class="navc" data-act="${v === "summary" ? "go-summary" : "go"}" data-v="${v === "summary" ? todayS().slice(0,7) : v}" style="--c:${c}">${svg}<div style="min-width:0"><b>${title}</b><span>${sub}</span></div></button>`;
+  return `${inviteCard()}<section class="sec"><div class="navgrid">
+      ${nav("premios", "#F6C445", stickerSVG("star", "#F6C445", charSVG({ char:"heart", color:"#F0644B", face:"happy" })), "Premios", `${starBalance(me)}⭐ para canjear`)}
+      ${nav("avisos", "#3BBDAE", stickerSVG("scallop", "#3BBDAE", charSVG({ char:"dog", color:"#C08A5B", face:"happy" })), "Avisos", ui.pushState === "on" || DEMO ? `${nRem} ${nRem === 1 ? "activo" : "activos"}` : "Activá las notificaciones")}
+      ${nav("summary", "#EF8BB3", stickerSVG("heart", "#EF8BB3", charSVG({ char:"star", color:"#F6C445", face:"happy" })), "Resumen", `Su ${monthLabel(todayS().slice(0,7))}`)}
+      ${nav("casa", "#7F9BE0", stickerSVG("square", "#7F9BE0", charSVG({ char:"cloud", color:"#B58AE8", face:"dots" })), "La casa", "Oficina, dueños, rutina")}
     </div></section>${familySection()}
-  <section class="sec"><div class="sec-h"><h2>Perfiles y estrellitas</h2></div>
-    <div class="prof">${KEYS.map(k => { const P = prof(k), st = stickersFor(k), got = st.filter(s => s.got).length;
-      return `<div class="card"><div class="head">${charSVG(P)}<div><h3>${esc(P.name)}${k===me?' <span class="pill">vos</span>':""}</h3>
-        <div class="small muted tnum">${pointsBy(k, from, t)}⭐ en 30 días · ${got} de ${st.length} estampitas</div></div></div>
-        ${k===me ? `<button class="btn sm ghost" data-act="edit-prof" style="align-self:flex-start">Cambiar personaje</button>` : ""}</div>`; }).join("")}</div>
-  </section>
-  ${KEYS.map(k => `<section class="sec"><div class="sec-h"><h2>Álbum de ${esc(prof(k).name)}</h2></div>
-    <div class="album">${stickersFor(k).map(s => `<div class="stk ${s.got?"":"locked"}">${s.got && s.count > 1 ? `<span class="cnt">×${s.count}</span>` : ""}${stickerSVG(s.frame, s.color, charSVG(s.charP))}<b>${esc(s.name)}</b><small>${esc(s.desc)}</small></div>`).join("")}</div></section>`).join("")}
+  <section class="sec"><div class="sec-h"><h2>Álbum</h2><div class="seg">${KEYS.map(k => `<button data-act="album" data-v="${k}" aria-pressed="${ak === k}">${esc(prof(k).name)}</button>`).join("")}</div></div>
+    <div class="album">${st.map(s => `<button class="stk ${s.got?"":"locked"}" data-act="stk" data-v="${esc(s.desc)}">${s.got && s.count > 1 ? `<span class="cnt">×${s.count}</span>` : ""}${stickerSVG(s.frame, s.color, charSVG(s.charP))}<b>${esc(s.name)}</b></button>`).join("")}</div>
+    <span class="small muted">${st.filter(s => s.got).length} de ${st.length} · tocá una para ver cómo se gana</span>
+  </section>`;
+}
+function viewHouse(){
+  const ctx = homeCtx();
+  return `<div class="row" style="margin-top:8px"><button class="icon-btn" data-act="go" data-v="nosotros" aria-label="Volver">${ic("left")}</button><h2 style="font-size:22px">La casa</h2></div>
   ${usExtra()}
   <section class="sec"><div class="sec-h"><h2>Nuestro hogar</h2></div>
     <form class="card" data-form="ctx" style="display:flex;flex-direction:column;gap:12px">
       <div class="field"><label for="ctxPet">Nombre de la mascota</label><input class="inp" id="ctxPet" value="${esc(ctx.pet ?? "Vita")}" maxlength="40"></div>
-      <div class="field"><label for="ctxAbout">Contanos de su rutina</label><textarea class="inp" id="ctxAbout" maxlength="2000" placeholder="Quién va al gimnasio y cuándo, qué días trabajan desde casa, manías de la casa…">${esc(ctx.about ?? "")}</textarea>
-        <span class="small muted">Nido usa esto para personalizar las ideas y los avisos.</span></div>
+      <div class="field"><label for="ctxAbout">Contanos de su rutina</label><textarea class="inp" id="ctxAbout" maxlength="2000" placeholder="Quién va al gimnasio y cuándo, qué días trabajan desde casa, manías de la casa…">${esc(ctx.about ?? "")}</textarea></div>
       <button class="btn pri" type="submit" style="align-self:flex-start">Guardar</button>
     </form>
   </section>
@@ -1049,14 +1053,13 @@ function taskSheet(id, presetDay){
       <button type="button" class="chip" data-pick="who" data-v="none" aria-pressed="${draft.assignees.length===0}">Después vemos</button></div></div>
     <div class="field"><span class="lbl">¿Cuándo?</span><div class="wrap-row">${dayChoices(draft.day)}</div><span class="hint" id="dayHint"></span></div>
     <div class="field"><label for="tTime">Horario (opcional)</label><input class="inp" type="time" id="tTime" value="${esc(t.time||"")}" style="max-width:160px"></div>
-    <div class="field"><span class="lbl">¿Cuánto esfuerzo? (son las estrellitas que da)</span><div class="wrap-row">
+    <div class="field"><span class="lbl">¿Cuánto esfuerzo?</span><div class="wrap-row">
       ${effortChips(draft.points)}</div></div>
     <div class="field"><label for="tRepeat">Repetir</label><select class="inp" id="tRepeat">${Object.entries(REPEATS).map(([k,v]) => `<option value="${k}" ${(t.repeat||"none")===k?"selected":""}>${v}</option>`).join("")}</select></div>
-    <div class="field"><div class="row"><button type="button" class="switch" role="switch" id="tCal" aria-checked="${draft.cal}" aria-label="Mostrar en Google Calendar"></button><span><b>En Google Calendar</b><span class="small muted" style="display:block">Para lo importante: veterinario, turnos, compras grandes.</span></span></div></div>
+    <div class="field"><div class="row"><button type="button" class="switch" role="switch" id="tCal" aria-checked="${draft.cal}" aria-label="Mostrar en Google Calendar"></button><span><b>En Google Calendar</b></span></div></div>
     <div class="field"><span class="lbl">Dueño de esta tarea</span><div class="wrap-row">
       <button type="button" class="chip" data-pick="owner" data-v="" aria-pressed="${!draft.owner}">Nadie fijo</button>
-      ${KEYS.map(k => `<button type="button" class="chip" data-pick="owner" data-v="${k}" aria-pressed="${draft.owner===k}">${CROWN}${esc(prof(k).name)}</button>`).join("")}</div>
-      <span class="small muted">El dueño se encarga siempre: cada vez que alguien la anote, se le asigna sola.</span></div>
+      ${KEYS.map(k => `<button type="button" class="chip" data-pick="owner" data-v="${k}" aria-pressed="${draft.owner===k}">${CROWN}${esc(prof(k).name)}</button>`).join("")}</div></div>
     ${id && t.status === "done" ? `<div class="field"><span class="lbl">La hizo</span><div class="wrap-row">${KEYS.map(k => `<button type="button" class="chip" data-pick="doneby" data-v="${k}" aria-pressed="${(t.doneBy||[]).length===1&&t.doneBy[0]===k}">${esc(prof(k).name)}</button>`).join("")}<button type="button" class="chip" data-pick="doneby" data-v="both" aria-pressed="${(t.doneBy||[]).length===2}">Los dos</button></div></div>` : ""}
     <div class="sheet-foot">
       ${id ? `<button type="button" class="btn danger" data-del="${id}">Borrar</button>` : ""}
@@ -1205,7 +1208,7 @@ function moodCard(){
   return `<section class="sec"><div class="sec-h"><h2>¿Cómo venís de energía hoy?</h2><button class="btn sm ghost" data-act="edit-prof">Cambiar personaje</button></div>
     <div class="moods">${MOODS.map(m => `<button class="mood-b ${ui.moodPlay?.who === me && ui.moodPlay.lv === m.lv && Date.now() < ui.moodPlay.until ? "play" : ""}" data-act="mood" data-v="${m.lv}" aria-pressed="${mine===m.lv}">${moodSVG(prof(me), m.lv)}<span>${m.name}</span></button>`).join("")}</div>
     <div class="mood-other">${theirs ? `<button class="mood-peek ${ui.moodPlay?.who === o && Date.now() < ui.moodPlay.until ? "play" : ""}" data-act="mood-peek" data-v="${theirs}" aria-label="Ver cómo viene ${esc(prof(o).name)}">${moodSVG(prof(o), theirs)}</button>` : charSVG({ ...prof(o), face:"dots" })}<span>${theirs ? `${esc(prof(o).name)} hoy: <b style="color:var(--ink)">${moodName(theirs)}</b>` : `${esc(prof(o).name)} todavía no contó cómo viene.`}</span></div>
-    ${isOffice(me, t) ? `<div class="small muted">Hoy es tu día de oficina: Nido te sugiere cargarte menos cosas.</div>` : ""}
+    ${isOffice(me, t) ? `` : ""}
     <button class="btn ghost wide" data-act="quick-done">${ic("check")}Hice algo que no estaba anotado</button>
   </section>`;
 }
@@ -1224,16 +1227,14 @@ function usExtra(){
   const t = todayS();
   const aways = Object.values(store.away).filter(a => (a.to || a.from) >= t).sort((a,b) => a.from.localeCompare(b.from));
   const owners = Object.entries(ownersMap()).sort((a,b) => a[1].title.localeCompare(b[1].title));
-  return `<section class="sec"><button class="month-banner" data-act="go-summary" data-v="${t.slice(0,7)}">${stickerSVG("scallop", "#EF8BB3", charSVG({ char:"star", color:"#F6C445", face:"happy" }))}<div><div class="eyebrow">Resumen mensual</div><b>Ver cómo viene su ${monthLabel(t.slice(0,7))}</b></div></button></section>
+  return `
   <section class="sec"><div class="sec-h"><h2>Disponibilidad</h2><button class="btn sm pri" data-act="away-new">Avisar que no puedo</button></div>
-    <p class="small muted" style="margin:0">Los días de oficina cuentan como días livianos: Nido te sugiere no cargar más de una tarea esos días.</p>
     <div class="prof">${KEYS.map(k => `<div class="card"><div class="row">${charSVG(prof(k)).replace('class="char"','class="char" style="width:36px;height:36px"')}<b>${esc(prof(k).name)}</b></div>
       <div class="field"><span class="lbl">Días de oficina</span><div class="wrap-row">${DAYS_S.slice(0,5).map((n,i) => `<button class="chip" data-act="office" data-k="${k}" data-v="${i}" aria-pressed="${officeDays(k).includes(i)}">${n}</button>`).join("")}</div></div></div>`).join("")}</div>
-    <div class="card">${aways.length ? aways.map(a => `<div class="list-row">${charSVG(prof(a.who))}<div class="grow"><b>${esc(prof(a.who).name)} no puede</b> · ${shortDay(a.from)}${a.to && a.to !== a.from ? ` – ${shortDay(a.to)}` : ""}${a.note ? `<div class="small muted">${esc(a.note)}</div>` : ""}</div><button class="x" data-act="away-del" data-v="${a.id}" aria-label="Borrar">${ic("x",2.4)}</button></div>`).join("") : `<div class="small muted">Nadie avisó que no puede en los próximos días.</div>`}</div>
+    <div class="card">${aways.length ? aways.map(a => `<div class="list-row">${charSVG(prof(a.who))}<div class="grow"><b>${esc(prof(a.who).name)} no puede</b> · ${shortDay(a.from)}${a.to && a.to !== a.from ? ` – ${shortDay(a.to)}` : ""}${a.note ? `<div class="small muted">${esc(a.note)}</div>` : ""}</div><button class="x" data-act="away-del" data-v="${a.id}" aria-label="Borrar">${ic("x",2.4)}</button></div>`).join("") : `<div class="small muted">Nadie avisó que no puede.</div>`}</div>
   </section>
   <section class="sec"><div class="sec-h"><h2>Dueños de tareas</h2></div>
-    <p class="small muted" style="margin:0">El dueño se encarga siempre de esa tarea. Cuando alguien la anota, se le asigna sola.</p>
-    <div class="card">${owners.length ? owners.map(([key, o]) => `<div class="list-row">${charSVG(prof(o.who))}<div class="grow">${CROWN} <b>${esc(o.title)}</b> · es de ${esc(prof(o.who).name)}</div><button class="x" data-act="owner-del" data-v="${esc(key)}" aria-label="Quitar dueño">${ic("x",2.4)}</button></div>`).join("") : `<div class="small muted">Todavía no hay dueños. Por ejemplo: la basura es de Fede.</div>`}
+    <div class="card">${owners.length ? owners.map(([key, o]) => `<div class="list-row">${charSVG(prof(o.who))}<div class="grow">${CROWN} <b>${esc(o.title)}</b> · es de ${esc(prof(o.who).name)}</div><button class="x" data-act="owner-del" data-v="${esc(key)}" aria-label="Quitar dueño">${ic("x",2.4)}</button></div>`).join("") : `<div class="small muted">Sin dueños todavía.</div>`}
       <form class="own-form" data-form="owner" style="margin-top:12px"><input class="inp" id="ownTitle" placeholder="Tarea (ej: Sacar la basura)" list="ownList" maxlength="80"><datalist id="ownList">${[...TEMPLATES, ...TEMPLATES_G].map(([n]) => `<option value="${esc(n)}">`).join("")}</datalist>
         <select class="inp" id="ownWho">${KEYS.map(k => `<option value="${k}" ${k===me?"selected":""}>${esc(prof(k).name)}</option>`).join("")}</select><button class="btn pri" type="submit">Asignar dueño</button></form></div>
   </section>`;
@@ -1261,7 +1262,6 @@ function awaySheet(){
 function quickDoneSheet(){
   const d = { kind:"hogar", by:[me], points:1 };
   openSheet(`<form style="display:contents"><h2>Hice algo que no estaba anotado</h2>
-    <p class="small muted" style="margin:0">Así queda registrado igual, aunque no estuviera en la lista.</p>
     <div class="field"><span class="lbl">Tipo</span><div class="wrap-row">${Object.entries(KINDS).map(([k,v]) => `<button type="button" class="chip" data-pick="kind" data-v="${k}" aria-pressed="${k==="hogar"}">${v}</button>`).join("")}</div></div>
     <div class="field"><label for="qTitle">¿Qué hiciste?</label><input class="inp" id="qTitle" required maxlength="80" placeholder="Desatascar la pileta"></div>
     <div class="field"><label for="qPick">…o elegí una frecuente</label>${catalogSelect("qPick")}</div>
@@ -1392,7 +1392,7 @@ function viewSummary(){
       <button class="icon-btn" data-act="month" data-v="-1" aria-label="Mes anterior">${ic("left")}</button>
       <button class="icon-btn" data-act="month" data-v="1" aria-label="Mes siguiente" ${isFuture?"disabled":""}>${ic("right")}</button>
       <h1>Su ${monthLabel(m)} en el nido</h1></div>
-    ${!S.done.length ? `<div class="empty" style="margin-top:16px">Todavía no hay tareas hechas en ${monthLabel(m)}. Cuando marquen la primera, el resumen empieza a llenarse.</div>` : `
+    ${!S.done.length ? `<div class="empty" style="margin-top:16px">Todavía no hay tareas hechas en ${monthLabel(m)}.</div>` : `
     <section class="sec"><div class="prof">${KEYS.map(k => `<div class="card"><div class="head">${charSVG(prof(k))}<div><h3>${esc(prof(k).name)}</h3><div class="big tnum">${P[k].pts}⭐</div></div></div>
       <div><div class="stat"><span>Tareas hechas</span><b>${P[k].n}</b></div><div class="stat"><span>De gestión</span><b>${P[k].gest}</b></div><div class="stat"><span>Sin que estuvieran anotadas</span><b>${P[k].spont}</b></div>
       <div class="stat"><span>Hábitos saludables</span><b>${P[k].habitN} · ${P[k].habitPts}⭐</b></div><div class="stat"><span>Gustitos</span><b>${P[k].treats}</b></div><div class="stat"><span>Compras del súper por app</span><b>${P[k].apps}</b></div>
@@ -1444,10 +1444,10 @@ async function enablePush(){
 function pushCard(){
   const dog = charSVG({ char:"dog", color:"#C08A5B", face:"happy" }), st = ui.pushState;
   if (st === "demo") return `<p class="small muted" style="margin:0">En la app conectada, acá activás las notificaciones de cada dispositivo.</p>`;
-  if (st === "on") return `<div class="next-rem">${dog}<div><b>Notificaciones activadas en este dispositivo.</b><div class="small muted">Te llegan los avisos y las gracias aunque Nido esté cerrado.</div></div></div>`;
+  if (st === "on") return `<div class="next-rem">${dog}<div><b>Notificaciones activadas en este dispositivo.</b><div class="small muted">Te llegan aunque Nido esté cerrado.</div></div></div>`;
   if (st === "ios-install") return `<div class="next-rem">${dog}<div><b>Para recibir avisos en el iPhone</b><div class="small muted">Primero agregá Nido a la pantalla de inicio (botón Compartir › “Agregar a inicio”) y abrilo desde ese ícono. Ahí aparece el botón para activarlas.</div></div></div>`;
   if (st === "unsupported") return `<p class="small muted" style="margin:0">Este navegador no permite notificaciones. Probá desde Chrome, Safari o la app instalada.</p>`;
-  return `<div class="next-rem">${dog}<div><b>Activá las notificaciones</b><div class="small muted">Así te llegan los avisos y las gracias aunque Nido esté cerrado. Se hace una vez en cada dispositivo.</div><button class="btn sm pri" data-act="push-on" style="margin-top:8px">Activar en este dispositivo</button></div></div>`;
+  return `<div class="next-rem">${dog}<div><b>Activá las notificaciones</b><div class="small muted">Una vez en cada dispositivo.</div><button class="btn sm pri" data-act="push-on" style="margin-top:8px">Activar en este dispositivo</button></div></div>`;
 }
 async function notify(to, body){
   if (!SB || !HH || !to?.length) return;
@@ -1463,14 +1463,14 @@ function copyText(txt, ok){
 function syncSheet(){
   const url = HH ? `${location.origin}/cal/${HH.cal_token}.ics` : "";
   openSheet(`<h2>Google Calendar</h2>
-    <p style="margin:0">Suscribí tu Google Calendar a este link una sola vez. Aparecen solas las tareas que marques como <b>“En Google Calendar”</b> al crearlas o editarlas: lo importante, como veterinario, turnos o compras grandes.</p>
+    <p style="margin:0">Muestra las tareas marcadas como <b>“En Google Calendar”</b>. Se configura una sola vez.</p>
     ${url ? `<div class="row"><input class="inp" id="calUrl" readonly value="${esc(url)}"><button class="btn pri" data-copy="1">Copiar</button></div>` : `<div class="empty">Disponible en la app conectada.</div>`}
     <ol class="small" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px">
       <li>Copiá el link.</li>
       <li>En la compu, abrí <a href="https://calendar.google.com/calendar/u/0/r/settings/addbyurl" target="_blank" rel="noopener">Google Calendar › Agregar calendario › Desde URL</a>.</li>
       <li>Pegalo y tocá “Agregar calendario”. Aparece un calendario llamado “Nido”.</li>
     </ol>
-    <p class="small muted" style="margin:0">Google lo actualiza solo cada algunas horas. Cada uno puede suscribirse desde su cuenta. El link es privado: no lo compartas fuera de casa.</p>
+    <p class="small muted" style="margin:0">Google lo actualiza cada algunas horas. El link es privado.</p>
     <div class="sheet-foot"><button class="btn ghost" data-close="1">Listo</button></div>`, sheet => {
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.copy) copyText(url, "Link copiado");
@@ -1615,7 +1615,7 @@ function inviteCard(always){
   const pending = KEYS.some(k => !store.profiles[k]?.uid);
   if (!always && (!pending || homeCtx().inviteSent)) return "";
   const url = `${location.origin}/?join=${HH.invite_code}`;
-  return `<section class="sec"><div class="card" style="display:flex;flex-direction:column;gap:10px;background:color-mix(in srgb,var(--sky) 16%,var(--paper))"><b>${pending ? `Invitar a ${esc(prof(other(me)).name)}` : "Link de invitación"}</b><span class="small muted">Mandale este link. Entra con su mail y queda en este mismo nido.</span><div class="row"><input class="inp" id="inviteUrl" readonly value="${esc(url)}"><button class="btn pri" data-act="copy" data-v="inviteUrl">Copiar</button></div></div></section>`;
+  return `<section class="sec"><div class="card" style="display:flex;flex-direction:column;gap:10px;background:color-mix(in srgb,var(--sky) 16%,var(--paper))"><b>${pending ? `Invitar a ${esc(prof(other(me)).name)}` : "Link de invitación"}</b><div class="row"><input class="inp" id="inviteUrl" readonly value="${esc(url)}"><button class="btn pri" data-act="copy" data-v="inviteUrl">Copiar</button></div></div></section>`;
 }
 function familySection(){
   return `<section class="sec"><div class="sec-h"><h2>Quiénes somos</h2><span class="small muted">Dos humanos, una perra y tres gatas</span></div>
@@ -1626,8 +1626,7 @@ function famSheet(key){
   const f = FAMILY.find(x => x.key === key); if (!f) return;
   openSheet(`<form style="display:contents"><div style="display:flex;justify-content:center">${famSVG(key).replace('class="fam"','class="fam" style="width:120px;height:120px"')}</div>
     <h2 style="text-align:center">${esc(famName(f))}</h2>
-    <div class="field"><label for="famBio">Personalidad</label><textarea class="inp" id="famBio" maxlength="200" style="min-height:90px">${esc(famBio(f))}</textarea>
-      <span class="small muted">Nido usa esto para los avisos y las ideas.</span></div>
+    <div class="field"><label for="famBio">Personalidad</label><textarea class="inp" id="famBio" maxlength="200" style="min-height:90px">${esc(famBio(f))}</textarea></div>
     <div class="sheet-foot"><span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
     sheet.addEventListener("click", e => { if (e.target.closest("[data-close]")) closeSheet(); });
     sheet.querySelector("form").addEventListener("submit", e => { e.preventDefault();
@@ -1689,7 +1688,7 @@ function habitCard(h, days){
   const isT = h.kind === "treat", rows = h.mode === "together" ? [["both","Juntos"]] : KEYS.map(k => [k, prof(k).name]);
   const lim = isT ? (h.budget ?? 2) : (h.goal || 0), t = todayS();
   return `<div class="card habit ${isT?"treat":""}">
-    <div class="row"><div class="grow"><b>${esc(h.name)}</b><div class="small muted">${isT ? (h.vs ? "Neutro mientras sea 1 de cada 5 comidas (80/20). Más que eso resta 1 ⭐" : `Gustito · hasta ${lim} por semana suman, después restan`) : `${lim ? `Meta: ${lim} por semana · ` : ""}<span class="stars">${"★".repeat(h.points||1)}</span> cada vez`} · ${h.mode === "together" ? "juntos" : "cada uno"}</div></div>
+    <div class="row"><div class="grow"><b>${esc(h.name)}</b><div class="small muted">${isT ? (h.vs ? "80/20: neutro, de más resta" : `Hasta ${lim} por semana`) : `${lim ? `${lim} por semana · ` : ""}<span class="stars">${"★".repeat(h.points||1)}</span>`} · ${h.mode === "together" ? "juntos" : "cada uno"}</div></div>
       <button class="btn sm ghost" data-act="edit-habit" data-v="${h.id}">Editar</button></div>
     ${rows.map(([w, label]) => { const cnt = days.filter(d => store.habitlog[logKey(h.id, d, w)]).length;
       const hc = isT ? "#F49A86" : w === "both" ? "#B58AE8" : prof(w).color;
@@ -1708,7 +1707,6 @@ function viewHabits(){
   const sc = habitScore(from, to);
   const canNext = v === "month" ? ui.habitMonth < todayS().slice(0,7) : v === "year" ? ui.habitYear < new Date().getFullYear() : false;
   return `<section class="sec"><div class="sec-h"><h2>Hábitos de a dos</h2><button class="btn sm pri" data-act="new-habit">${ic("plus")}Nuevo hábito</button></div>
-      <p class="small muted" style="margin:0">Cada semana arranca de cero en la grilla, pero todo queda guardado: en Mes y Año ven el historial. Cocinar en casa suma; el delivery o cheat meal es neutro mientras sea 1 de cada 5 comidas (80/20).</p>
       <div class="row" style="flex-wrap:wrap;justify-content:space-between">
         <div class="seg">${[["week","Semana"],["month","Mes"],["year","Año"]].map(([k,l]) => `<button data-act="habit-view" data-v="${k}" aria-pressed="${v===k}">${l}</button>`).join("")}</div>
         ${v !== "week" ? `<div class="row"><button class="icon-btn" data-act="hnav" data-v="-1" aria-label="Anterior">${ic("left")}</button><b style="min-width:90px;text-align:center">${label}</b><button class="icon-btn" data-act="hnav" data-v="1" aria-label="Siguiente" ${canNext ? "" : "disabled"}>${ic("right")}</button></div>` : ""}
@@ -1728,8 +1726,7 @@ function habitSheet(id){
     <div class="field"><span class="lbl">¿De a uno o juntos?</span><div class="wrap-row"><button type="button" class="chip" data-pick="mode" data-v="solo" aria-pressed="${d.mode==="solo"}">Cada uno</button><button type="button" class="chip" data-pick="mode" data-v="together" aria-pressed="${d.mode==="together"}">Juntos</button></div></div>
     <div class="field" id="fGoal" ${d.kind==="treat"?"hidden":""}><label for="hGoal">Meta por semana</label><select class="inp" id="hGoal" style="max-width:200px">${[0,1,2,3,4,5,6,7].map(n => `<option value="${n}" ${(h.goal||0)===n?"selected":""}>${n ? `${n} ${n===1?"vez":"veces"}` : "Sin meta"}</option>`).join("")}</select></div>
     <div class="field" id="fPts" ${d.kind==="treat"?"hidden":""}><span class="lbl">Estrellitas por vez</span><div class="wrap-row">${[1,2,3].map(p => `<button type="button" class="chip" data-pick="pts" data-v="${p}" aria-pressed="${d.points===p}"><span class="stars">${"★".repeat(p)}</span></button>`).join("")}</div></div>
-    <div class="field" id="fBudget" ${d.kind==="treat"?"":"hidden"}><label for="hBudget">Sin culpa hasta (por semana)</label><select class="inp" id="hBudget" style="max-width:200px">${[0,1,2,3,4,5].map(n => `<option value="${n}" ${(h.budget ?? 2)===n?"selected":""}>${n} ${n===1?"vez":"veces"}</option>`).join("")}</select>
-      <span class="small muted">Dentro del límite cada gustito suma 1 ⭐. Pasado el límite, resta 1.</span></div>
+    <div class="field" id="fBudget" ${d.kind==="treat"?"":"hidden"}><label for="hBudget">Sin culpa hasta (por semana)</label><select class="inp" id="hBudget" style="max-width:200px">${[0,1,2,3,4,5].map(n => `<option value="${n}" ${(h.budget ?? 2)===n?"selected":""}>${n} ${n===1?"vez":"veces"}</option>`).join("")}</select></div>
     <div class="sheet-foot">${id ? `<button type="button" class="btn danger" data-del="1">Borrar</button>` : ""}<span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
     const setKind = k => { d.kind = k; sheet.querySelector("#fGoal").hidden = sheet.querySelector("#fPts").hidden = k === "treat"; sheet.querySelector("#fBudget").hidden = k !== "treat"; const r = sheet.querySelector("#hTpl"); if (r) r.innerHTML = tpl(k); syncPressed(sheet, "kind", v => v === k); };
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
@@ -1752,7 +1749,6 @@ function buySheet(){
   openSheet(`<h2>Terminar compra</h2>
     <p style="margin:0">${got.length} ${got.length===1?"cosa":"cosas"} en el changuito. ¿Cómo hiciste la compra?</p>
     <div class="wrap-row"><button class="btn pri" data-via="store">Fui al súper</button><button class="btn pri" data-via="app">La pedí por app</button></div>
-    <p class="small muted" style="margin:0">Las dos formas suman 2 ⭐ para quien hizo la compra.</p>
     <div class="sheet-foot"><button class="btn ghost" data-close="1">Cancelar</button></div>`, sheet => {
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.close){ closeSheet(); return; }
@@ -1794,7 +1790,6 @@ function quickRow(d){
 function routinesSection(){
   const rs = routines();
   return `<section class="sec"><div class="sec-h"><h2>Rutinas</h2><button class="btn sm ghost" data-act="new-routine">${ic("plus")}Nueva rutina</button></div>
-    <p class="small muted" style="margin:0">Lo de todos los días, como sacar a Vita a la mañana. No aparece en la vista rápida; la ves al abrir cada día y, si querés, la marcás para sumar estrellitas.</p>
     ${rs.length ? `<div class="card rlist">${rs.map(r => `<div class="list-row"><span class="who" style="display:flex">${(r.who||[]).map(k => charSVG(prof(k))).join("")}</span><div class="grow"><b>${esc(r.title)}</b><div class="small muted">${(r.days||[]).length === 7 ? "Todos los días" : (r.days||[]).map(d => DAYS_S[d]).join(" · ")} · ${SLOTS[r.slot || ""]}</div></div><button class="btn sm ghost" data-act="edit-routine" data-v="${r.id}">Editar</button></div>`).join("")}</div>` : `<div class="empty">Sin rutinas todavía.</div>`}
   </section>`;
 }
@@ -1919,8 +1914,8 @@ function shopTopHTML(need){
     const buyer = m.buyer === "app" ? "se pide por app" : m.buyer === me ? "comprás vos" : `compra ${esc(prof(m.buyer).name)}`;
     html += `<div class="next-rem" style="background:color-mix(in srgb,var(--frog) 20%,var(--paper))">${charSVG(prof(m.closedBy))}<div style="flex:1;min-width:0"><b>Lista cerrada</b><div class="small muted">${esc(prof(m.closedBy).name)} la cerró ${agoText(m.closedAt)} · ${buyer}${added ? ` · se ${added === 1 ? "sumó 1 cosa" : `sumaron ${added} cosas`} después` : ""}</div></div><button class="btn sm ghost" data-act="shop-reopen">Reabrir</button></div>`;
   }
-  if (sug.length) html += `<div class="card" style="display:flex;flex-direction:column;gap:6px"><div class="row" style="justify-content:space-between"><b>Puede que falte</b><span class="small muted">según cada cuánto lo compran</span></div>
-    ${sug.map(s => `<div class="list-row"><div class="grow"><b>${esc(s.name)}</b><div class="small muted">Lo compran cada ~${s.avg} días · la última vez fue hace ${s.since}</div></div><button class="btn sm pri" data-act="shop-sugg" data-v="${esc(s.name)}">Sumar</button><button class="x" data-act="shop-snooze" data-v="${esc(s.k)}" data-avg="${s.avg}" aria-label="Todavía hay">${ic("x",2.4)}</button></div>`).join("")}</div>`;
+  if (sug.length) html += `<div class="card" style="display:flex;flex-direction:column;gap:6px"><div class="row" style="justify-content:space-between"><b>Puede que falte</b></div>
+    ${sug.map(s => `<div class="list-row"><div class="grow"><b>${esc(s.name)}</b><div class="small muted">Cada ~${s.avg} días · hace ${s.since}</div></div><button class="btn sm pri" data-act="shop-sugg" data-v="${esc(s.name)}">Sumar</button><button class="x" data-act="shop-snooze" data-v="${esc(s.k)}" data-avg="${s.avg}" aria-label="Todavía hay">${ic("x",2.4)}</button></div>`).join("")}</div>`;
   return html;
 }
 function closeListSheet(){
@@ -1930,7 +1925,7 @@ function closeListSheet(){
   openSheet(`<h2>Cerrar la lista</h2>
     <p style="margin:0">${need.length} ${need.length === 1 ? "cosa" : "cosas"} para comprar. ¿Quién hace la compra?</p>
     <div class="wrap-row">${KEYS.map(k => `<button class="chip" data-buyer="${k}" aria-pressed="${k === me}">${charSVG(prof(k))}${esc(prof(k).name)}</button>`).join("")}<button class="chip" data-buyer="app" aria-pressed="false">Por app</button></div>
-    <p class="small muted" style="margin:0">Le avisamos a ${esc(prof(other(me)).name)} con una notificación y la lista queda copiada para pegarla donde quieras.</p>
+    <p class="small muted" style="margin:0">Le avisamos a ${esc(prof(other(me)).name)}.</p>
     <div class="sheet-foot"><button class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" data-go="1">Cerrar y avisar</button></div>`, sheet => {
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.buyer){ buyer = b.dataset.buyer; sheet.querySelectorAll("[data-buyer]").forEach(x => x.setAttribute("aria-pressed", x === b)); }
@@ -1998,7 +1993,7 @@ function supplyCard(s){
       <button class="btn sm" data-act="supply-open" data-v="${s.id}">Abrimos una nueva</button></div></div>`;
 }
 function weightCard(ws){
-  if (!ws.length) return `<div class="empty">Sin pesos todavía. Anotalo después de cada visita a la vete.</div>`;
+  if (!ws.length) return `<div class="empty">Sin pesos todavía.</div>`;
   const last = ws[ws.length - 1], prev = ws[ws.length - 2], delta = prev ? +(last.kg - prev.kg).toFixed(2) : null;
   let spark = "";
   if (ws.length >= 2){
@@ -2027,15 +2022,15 @@ function viewPet(){
     <section class="sec"><div class="pet-hero" style="--fc:${f.c}">${famSVG(k)}<div style="min-width:0"><span class="role">${f.role}</span><h1>${esc(petName(k))}</h1>
       <div class="small muted">${[d.birth ? ageText(d.birth) : "", lastW ? `${fmtKg(lastW.kg)} kg` : ""].filter(Boolean).join(" · ")}</div><p style="margin:6px 0 0">${esc(famBio(f))}</p></div></div></section>
     <section class="sec"><div class="sec-h"><h2>Cuidados</h2><button class="btn sm ghost" data-act="care-new" data-v="${k}">${ic("plus")}Cuidado</button></div>
-      ${cares.length ? `<div class="card" style="padding:4px 14px">${cares.map(careRow).join("")}</div>` : `<div class="empty">Cargá vacunas, pipetas y controles. Nido les avisa el día anterior.</div>`}
+      ${cares.length ? `<div class="card" style="padding:4px 14px">${cares.map(careRow).join("")}</div>` : `<div class="empty">Sin cuidados cargados.</div>`}
       ${left.length ? `<div class="wrap-row" style="align-items:center"><span class="small muted">Sumar rápido:</span>${left.map(([n, e, p]) => `<button class="chip" data-act="care-preset" data-v="${k}" data-n="${esc(n)}" data-e="${e}" data-p="${p}">+ ${esc(n)}</button>`).join("")}</div>` : ""}
     </section>
     <section class="sec"><div class="sec-h"><h2>${petSpecies(k) === "cat" ? "Comida, piedras e insumos" : "Comida e insumos"}</h2><button class="btn sm ghost" data-act="supply-new" data-v="${k}">${ic("plus")}Insumo</button></div>
-      ${suppliesOf(k).length ? suppliesOf(k).map(supplyCard).join("") : `<div class="empty">Cargá el alimento y cuánto les dura la bolsa. Cuando quede poco, Nido lo suma solo al súper y les avisa.</div>`}
+      ${suppliesOf(k).length ? suppliesOf(k).map(supplyCard).join("") : `<div class="empty">Sin insumos cargados.</div>`}
     </section>
     <section class="sec"><div class="sec-h"><h2>Peso</h2><button class="btn sm ghost" data-act="weight-new" data-v="${k}">${ic("plus")}Anotar peso</button></div>${weightCard(ws)}</section>
     <section class="sec"><div class="sec-h"><h2>Historial</h2><button class="btn sm ghost" data-act="petlog-new" data-v="${k}">${ic("plus")}Agregar</button></div>
-      ${logs.length ? `<div class="card" style="padding:4px 14px">${logs.map(l => `<button class="list-row" style="width:100%;text-align:left" data-act="petlog-edit" data-v="${l.id}"><span class="pill tnum">${shortDay(l.date)}/${l.date.slice(2,4)}</span><div class="grow"><b>${esc(l.title)}</b>${l.text ? `<div class="small muted">${esc(l.text)}</div>` : ""}</div>${l.by ? charSVG(prof(l.by)) : ""}</button>`).join("")}</div>` : `<div class="empty">Acá queda todo: visitas a la vete, vacunas, lo que les dijeron.</div>`}
+      ${logs.length ? `<div class="card" style="padding:4px 14px">${logs.map(l => `<button class="list-row" style="width:100%;text-align:left" data-act="petlog-edit" data-v="${l.id}"><span class="pill tnum">${shortDay(l.date)}/${l.date.slice(2,4)}</span><div class="grow"><b>${esc(l.title)}</b>${l.text ? `<div class="small muted">${esc(l.text)}</div>` : ""}</div>${l.by ? charSVG(prof(l.by)) : ""}</button>`).join("")}</div>` : `<div class="empty">Sin historial todavía.</div>`}
     </section>`;
 }
 function petAlerts(){
@@ -2076,7 +2071,7 @@ function careSheet(id, preset){
   openSheet(`<form style="display:contents"><h2>${id ? "Editar cuidado" : `Nuevo cuidado para ${esc(petName(k))}`}</h2>
     <div class="field"><label for="cLabel">¿Qué es?</label><input class="inp" id="cLabel" required maxlength="50" value="${esc(c.label)}" placeholder="Pipeta"></div>
     <div class="field"><label for="cEvery">¿Cada cuánto?</label><select class="inp" id="cEvery" style="max-width:220px">${EVERY.map(([n, l]) => `<option value="${n}" ${+c.every === n ? "selected" : ""}>Cada ${l}</option>`).join("")}${EVERY.some(e => e[0] === +c.every) ? "" : `<option value="${c.every}" selected>Cada ${c.every} días</option>`}</select></div>
-    <div class="field"><label for="cLast">¿Cuándo fue la última vez?</label><input class="inp" type="date" id="cLast" value="${esc(c.last || "")}" max="${todayS()}" style="max-width:200px"><span class="small muted">Si no te acordás, dejalo vacío y tocá “Hecho” la próxima vez.</span></div>
+    <div class="field"><label for="cLast">¿Cuándo fue la última vez?</label><input class="inp" type="date" id="cLast" value="${esc(c.last || "")}" max="${todayS()}" style="max-width:200px"></div>
     <div class="field"><span class="lbl">¿Cuánto esfuerzo?</span><div class="wrap-row">${effortChips(c.points || 1, "")}</div></div>
     <div class="sheet-foot">${id ? `<button type="button" class="btn danger" data-del="1">Borrar</button>` : ""}<span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
     let pts = c.points || 1;
@@ -2098,7 +2093,7 @@ function supplySheet(id, petKey){
     <div class="wrap-row">${["Alimento de Vita","Alimento de las gatas","Piedras sanitarias","Snacks","Pipetas"].map(n => `<button type="button" class="chip" data-name="${esc(n)}">${esc(n)}</button>`).join("")}</div>
     <div class="field"><span class="lbl">¿Para quién?</span><div class="wrap-row">${PET_KEYS.map(k => `<button type="button" class="chip" data-pet="${k}" aria-pressed="${d.pets.includes(k)}">${esc(petName(k))}</button>`).join("")}</div></div>
     <div class="field"><label for="sLasts">¿Cuántos días les dura una bolsa o paquete?</label><input class="inp" type="number" id="sLasts" min="1" max="365" value="${s.lasts || 30}" style="max-width:120px"></div>
-    <div class="field"><div class="row"><button type="button" class="switch" role="switch" id="sAuto" aria-checked="${d.auto}" aria-label="Sumar al súper"></button><span><b>Sumar al súper cuando queden 3 días</b><span class="small muted" style="display:block">Y les llega un aviso al celu.</span></span></div></div>
+    <div class="field"><div class="row"><button type="button" class="switch" role="switch" id="sAuto" aria-checked="${d.auto}" aria-label="Sumar al súper"></button><span><b>Sumar al súper cuando queden 3 días</b></span></div></div>
     <div class="sheet-foot">${id ? `<button type="button" class="btn danger" data-del="1">Borrar</button>` : ""}<span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.name) $("#sName").value = b.dataset.name;
@@ -2183,7 +2178,6 @@ function batchSheet(preset, presetDay){
       <div class="row"><span class="pill tnum">${i + 1}</span><input class="inp" data-st="${i}" maxlength="60" value="${esc(st.title)}" placeholder="Paso ${i + 1}" style="padding:9px 12px">${steps.length > 2 ? `<button type="button" class="x" data-rm="${i}" aria-label="Quitar paso">${ic("x",2.4)}</button>` : ""}</div>
       <div class="wrap-row">${whoBtns(st, i)}<select class="inp" data-sp="${i}" style="width:auto;padding:5px 8px;font-size:13px" aria-label="Esfuerzo">${EFFORT.map((l, j) => `<option value="${j + 1}" ${st.points === j + 1 ? "selected" : ""}>${"★".repeat(j + 1)} ${l}</option>`).join("")}</select></div></div>`).join("");
   openSheet(`<form style="display:contents"><h2>${preset ? `Tanda: ${esc(preset[0])}` : "Armar una tanda"}</h2>
-    <p class="small muted" style="margin:0">Una tarea en pasos. Cuando alguien termina uno, Nido pregunta quién sigue.</p>
     <div class="field"><label for="bName">Nombre de la tanda</label><input class="inp" id="bName" maxlength="40" required value="${esc(preset ? preset[0] : "")}" placeholder="Lavar ropa"></div>
     <div class="field"><span class="lbl">Pasos</span><div id="bSteps" style="display:flex;flex-direction:column;gap:8px">${stepsHTML()}</div>
       <button type="button" class="add-day" data-add="1">+ Agregar paso</button></div>
@@ -2222,7 +2216,7 @@ function nextStepSheet(n, prev){
 /* ============ todas las tareas ============ */
 function freqList(q){
   const c = catalog().filter(x => !q || norm(x.title).includes(q));
-  return `<div class="row" style="justify-content:space-between"><span class="small muted">Son las que aparecen en el desplegable. Tocá una para cambiarle nombre, esfuerzo o dueño.</span><button class="btn sm pri" data-act="cat-new">${ic("plus")}Nueva</button></div>
+  return `<div class="row" style="justify-content:space-between"><span></span><button class="btn sm pri" data-act="cat-new">${ic("plus")}Nueva</button></div>
     ${c.length ? `<div class="card" style="padding:4px 14px">${c.map(x => { const own = ownerOf(x.title);
       return `<button class="list-row" style="width:100%;text-align:left" data-act="cat-edit" data-v="${esc(x.id)}"><div class="grow"><b>${esc(x.title)}</b><div class="small muted">${KINDS[x.kind || "hogar"]} · <span class="stars">${"★".repeat(x.points || 1)}</span> ${EFFORT[(x.points || 1) - 1]}${own ? ` · ${CROWN} de ${esc(prof(own).name)}` : ""}${x.cal ? " · Calendar" : ""}</div></div></button>`; }).join("")}</div>` : `<div class="empty">No hay frecuentes${q ? " con esa búsqueda" : ""}.</div>`}`;
 }
@@ -2268,7 +2262,7 @@ function catalogSheet(id){
     <div class="field"><span class="lbl">Tipo</span><div class="wrap-row">${Object.entries(KINDS).map(([k,v]) => `<button type="button" class="chip" data-pick="kind" data-v="${k}" aria-pressed="${d.kind===k}">${v}</button>`).join("")}</div></div>
     <div class="field"><span class="lbl">¿Cuánto esfuerzo?</span><div class="wrap-row">${effortChips(d.points)}</div></div>
     <div class="field"><span class="lbl">Dueño</span><div class="wrap-row"><button type="button" class="chip" data-pick="owner" data-v="" aria-pressed="${!d.owner}">Nadie fijo</button>${KEYS.map(k => `<button type="button" class="chip" data-pick="owner" data-v="${k}" aria-pressed="${d.owner===k}">${CROWN}${esc(prof(k).name)}</button>`).join("")}</div></div>
-    <div class="field"><div class="row"><button type="button" class="switch" role="switch" id="cfCal" aria-checked="${d.cal}" aria-label="En Google Calendar"></button><span><b>En Google Calendar</b><span class="small muted" style="display:block">Cada vez que la anoten, aparece en el calendario.</span></span></div></div>
+    <div class="field"><div class="row"><button type="button" class="switch" role="switch" id="cfCal" aria-checked="${d.cal}" aria-label="En Google Calendar"></button><span><b>En Google Calendar</b></span></div></div>
     <div class="sheet-foot">${id ? `<button type="button" class="btn danger" data-del="1">Borrar</button>` : ""}<span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       if (b.id === "cfCal"){ d.cal = !d.cal; b.setAttribute("aria-checked", d.cal); return; }
@@ -2308,11 +2302,10 @@ function viewRewards(){
     return `<div class="list-row"><div class="grow"><b>${esc(r.title)}</b><div class="bar" style="height:8px;margin-top:6px"><span style="width:${pct}%;background:${ok ? "var(--frog)" : "var(--sun)"}"></span></div><div class="small muted tnum" style="margin-top:3px">${r.cost}⭐</div></div>
       ${own ? `<button class="btn sm ${ok ? "pri" : "ghost"}" data-act="reward-claim" data-v="${r.id}" ${ok ? "" : "disabled"}>Canjear</button><button class="btn sm ghost" data-act="reward-edit" data-v="${r.id}">Editar</button>` : ""}</div>`; };
   return `<div class="row" style="margin-top:8px"><button class="icon-btn" data-act="go" data-v="nosotros" aria-label="Volver">${ic("left")}</button><h2 style="font-size:22px">Premios</h2></div>
-    <p class="small muted" style="margin:8px 0 0">Cada uno arma sus premios y les pone un precio en estrellitas. Cuando juntás suficientes, lo canjeás y el otro lo cumple.</p>
     <div class="score" style="margin-top:12px">${KEYS.map(k => `<div class="p" style="background:${shade(prof(k).color, .55)}">${charSVG(prof(k))}<div><div class="n tnum">${starBalance(k)}⭐</div><div class="small" style="font-weight:600">${esc(prof(k).name)} · para canjear</div></div></div>`).join("")}</div>
     ${open.length ? `<section class="sec"><div class="sec-h"><h2>Por cumplir</h2></div><div class="card" style="padding:4px 14px">${open.map(c => `<div class="list-row">${charSVG(prof(c.by))}<div class="grow"><b>${esc(c.title)}</b><div class="small muted">${esc(prof(c.by).name)} lo canjeó ${agoText(c.at)}</div></div>${c.by !== me ? `<button class="btn sm pri" data-act="claim-done" data-v="${c.id}">Cumplido</button>` : `<span class="small muted">Esperando a ${esc(prof(o).name)}</span>`}</div>`).join("")}</div></section>` : ""}
     <section class="sec"><div class="sec-h"><h2>Tus premios</h2><button class="btn sm ghost" data-act="reward-new">${ic("plus")}Premio</button></div>
-      ${mine.length ? `<div class="card" style="padding:4px 14px">${mine.map(r => rRow(r, true)).join("")}</div>` : `<div class="empty">Todavía no armaste premios. Elegí alguno de abajo o creá el tuyo.</div>`}
+      ${mine.length ? `<div class="card" style="padding:4px 14px">${mine.map(r => rRow(r, true)).join("")}</div>` : `<div class="empty">Todavía no armaste premios.</div>`}
       ${presets.length ? `<div class="wrap-row" style="align-items:center"><span class="small muted">Ideas:</span>${presets.map(([n, c]) => `<button class="chip" data-act="reward-preset" data-v="${esc(n)}" data-c="${c}">+ ${esc(n)} · ${c}⭐</button>`).join("")}</div>` : ""}</section>
     <section class="sec"><div class="sec-h"><h2>Los premios de ${esc(prof(o).name)}</h2></div>
       ${rewardsOf(o).length ? `<div class="card" style="padding:4px 14px">${rewardsOf(o).map(r => rRow(r, false)).join("")}</div>` : `<div class="empty">${esc(prof(o).name)} todavía no armó sus premios.</div>`}</section>
@@ -2322,7 +2315,7 @@ function rewardSheet(id, preset){
   const r = id ? store.rewards[id] : { title:preset?.title || "", cost:preset?.cost || 50 };
   openSheet(`<form style="display:contents"><h2>${id ? "Editar premio" : "Nuevo premio"}</h2>
     <div class="field"><label for="rwTitle">¿Qué querés?</label><input class="inp" id="rwTitle" required maxlength="60" value="${esc(r.title)}" placeholder="Desayuno en la cama"></div>
-    <div class="field"><label for="rwCost">¿Cuántas estrellitas cuesta?</label><input class="inp" id="rwCost" type="text" inputmode="numeric" value="${r.cost}" style="max-width:120px"><span class="small muted">Como referencia: una semana normal da entre 15 y 30 estrellitas.</span></div>
+    <div class="field"><label for="rwCost">¿Cuántas estrellitas cuesta?</label><input class="inp" id="rwCost" type="text" inputmode="numeric" value="${r.cost}" style="max-width:120px"></div>
     <div class="sheet-foot">${id ? `<button type="button" class="btn danger" data-del="1">Borrar</button>` : ""}<span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Guardar</button></div></form>`, sheet => {
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.del){ del("rewards", id); closeSheet(); }
@@ -2466,7 +2459,7 @@ document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]"); if (!el) return;
   const a = el.dataset.act, v = el.dataset.v;
   if (a === "close-sheet"){ if (e.target === el) closeSheet(); return; }
-  if (readOnly && !["go","close-sheet","wk","sync","month","go-summary","replay-thx","shop-copy","mood-peek","copy","logout","push-on","week-mode","day-open","habit-view","hnav","pet-open","copy-text","sync-retry","tf","tw"].includes(a) && me){ toast("Este nido está en modo lectura."); return; }
+  if (readOnly && !["go","close-sheet","wk","sync","month","go-summary","replay-thx","shop-copy","mood-peek","copy","logout","push-on","week-mode","day-open","habit-view","hnav","pet-open","copy-text","sync-retry","tf","tw","album","stk"].includes(a) && me){ toast("Este nido está en modo lectura."); return; }
   switch (a){
     case "go": ui.tab = v; render(); window.scrollTo({ top:0 }); break;
     case "claim": claim(v); break;
@@ -2504,6 +2497,8 @@ document.addEventListener("click", e => {
     case "go-summary": ui.tab = "resumen"; ui.month = v; render(); window.scrollTo({ top:0 }); break;
     case "month": { const [y, mo] = ui.month.split("-").map(Number); ui.month = ymd(new Date(y, mo - 1 + (+v), 1)).slice(0,7); render(); break; }
     case "letter": writeLetter(); break;
+    case "album": ui.albumOf = v; render(); break;
+    case "stk": toast(v); break;
     case "cat-new": catalogSheet(); break;
     case "cat-edit": catalogSheet(v); break;
     case "reward-new": rewardSheet(); break;
