@@ -391,6 +391,24 @@ textarea.inp{min-height:110px;resize:vertical}
 .navc b{display:block;font-size:14.5px}
 .navc span{display:block;font-size:12px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 button.stk{font:inherit;color:inherit}
+.hello2{display:flex;align-items:center;gap:12px;margin-top:6px}
+.hello2>button{border-radius:50%;padding:0;flex:none}
+.hello2 svg.char{width:56px;height:56px}
+.hello2 h1{font-size:25px;line-height:1.15}
+.weekbar{display:flex;flex-direction:column;gap:8px;width:100%;margin-top:14px;padding:12px 14px;border-radius:var(--r);background:var(--paper);box-shadow:var(--shadow);text-align:left}
+.weekbar svg.char{width:26px;height:26px}
+.weekbar b{font-family:var(--f-display);font-size:18px;font-weight:600}
+.weekbar .bal-bar{height:8px}
+.moodrow{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.moods.mini{gap:6px}
+.moods.mini .mood-b{padding:6px 2px;font-size:11.5px;border-radius:14px;box-shadow:none;background:var(--paper)}
+.moods.mini .mood-b svg{width:32px;height:32px}
+.mood-other .mood-peek svg{width:24px;height:24px}
+.theirs summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink-2);padding:6px 2px;list-style:none}
+.theirs summary::before{content:"›";display:inline-block;margin-right:6px;transition:transform .15s}
+.theirs[open] summary::before{transform:rotate(90deg)}
+.hscroll .wrap-row{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.hscroll .chip{white-space:nowrap;flex:none}
 @media (min-width:900px){.home-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:start}}
 </style>
 </head>
@@ -863,49 +881,48 @@ function taskCard(t, opts = {}){
 }
 
 function viewHome(){
-  const t = todayS(), P = prof(me), ws = weekStart(t), we = addDays(ws, 6);
-  const a = pointsBy("pau", ws, we), b = pointsBy("fede", ws, we), tot = a + b;
-  const pa = tot ? Math.round(a/tot*100) : 50;
-  const todays = tasksOn(t);
-  const mine = todays.filter(x => (x.assignees||[]).includes(me));
-  const rest = todays.filter(x => !(x.assignees||[]).includes(me));
-  const late = tasks().filter(x => x.day && x.day < t && x.status !== "done").sort((x,y) => x.day.localeCompare(y.day));
-  const pending = mine.filter(x => x.status !== "done").length;
-  const sug = suggestions();
-  const nr = nextReminder();
+  const t = todayS(), P = prof(me), o = other(me), ws = weekStart(t), we = addDays(ws, 6);
+  const a = pointsBy("pau", ws, we), b = pointsBy("fede", ws, we), tot = a + b, pa = tot ? Math.round(a / tot * 100) : 50;
+  const mine = tasksOn(t).filter(x => (x.assignees || []).includes(me) && !x.routine);
+  const late = tasks().filter(x => x.day && x.day < t && x.status !== "done" && ((x.assignees || []).includes(me) || !(x.assignees || []).length)).sort((x, y) => x.day.localeCompare(y.day));
+  const theirs = tasksOn(t).filter(x => !(x.assignees || []).includes(me) && !x.routine);
+  const theirsLeft = theirs.filter(x => x.status !== "done").length;
+  const list = [...late, ...mine];
   const hr = new Date().getHours(), greet = hr < 6 ? "Buenas noches" : hr < 13 ? "Buen día" : hr < 20 ? "Buenas tardes" : "Buenas noches";
-  const balNote = tot === 0 ? "Todavía no hay estrellitas esta semana. ¡La primera tarea arranca la cuenta!" :
-    Math.abs(a-b) <= Math.max(2, tot*.15) ? "Vienen parejos esta semana. 💜" :
-    `${prof(a > b ? "pau" : "fede").name} viene sumando más esta semana.`;
+  const mineM = moodOf(me, t), om = moodOf(o, t), play = lv => ui.moodPlay?.who === me && ui.moodPlay.lv === lv && Date.now() < ui.moodPlay.until;
+
+  // Un solo bloque con lo que hay que tener en cuenta (máximo 4 cosas)
+  const notes = [], row = (icon, title, sub, btn = "", act = "") => `<div class="list-row" ${act}>${icon}<div class="grow"><b>${title}</b>${sub ? `<div class="small muted">${sub}</div>` : ""}</div>${btn}</div>`;
+  const nr = nextReminder();
+  if (nr && nr.off === 0) notes.push(row(charSVG({ char:"dog", color:"#C08A5B", face:"happy" }), esc(nr.r.text), `Hoy ${esc(nr.r.time)} hs`, "", `data-act="go" data-v="avisos" style="cursor:pointer"`));
+  petAlerts().slice(0, 2).forEach(al => notes.push(row(`<span class="pet-mini">${famSVG(al.k)}</span>`, esc(petName(al.k)), `<span style="${al.urgent ? "color:var(--tomato);font-weight:600" : ""}">${esc(al.txt)}</span>`, "", `data-act="pet-open" data-v="${al.k}" style="cursor:pointer"`)));
+  const sug = suggestions()[0];
+  if (sug) notes.push(row(charSVG(prof(sug.who || me)), "Idea", esc(sug.text), sug.act ? `<button class="btn sm pri" data-act="apply" data-v='${esc(JSON.stringify(sug.act))}'>${esc(sug.label)}</button>` : ""));
+  const rs = rewardsOf(me), bal = starBalance(me), can = rs.filter(r => r.cost <= bal).pop();
+  if (can) notes.push(row(stickerSVG("star", "#F6C445", charSVG({ char:"heart", color:"#F0644B", face:"party" })), `Ya podés canjear “${esc(can.title)}”`, `${bal}⭐ disponibles`, `<button class="btn sm" data-act="go" data-v="premios">Ver</button>`));
+  const dn = parse(t).getDate();
+  if (dn <= 5){ const d = parse(t); d.setDate(1); d.setMonth(d.getMonth() - 1); const pm = ymd(d).slice(0, 7);
+    notes.push(row(stickerSVG("scallop", "#EF8BB3", charSVG({ char:"star", color:"#F6C445", face:"happy" })), `Resumen de ${monthLabel(pm)}`, "", `<button class="btn sm" data-act="go-summary" data-v="${pm}">Ver</button>`)); }
+
   return `<div class="home-grid"><div>
-    <div class="hello"><button data-act="edit-prof" aria-label="Cambiar tu personaje" title="Cambiar tu personaje">${charSVG(P, "char wiggle")}</button><div>
-      <div class="eyebrow">${DAYS[dow(t)]} ${fmtDay(t)}</div>
-      <h1>${greet}, ${esc(P.name)}</h1>
-      <div class="muted">${pending ? `Hoy tenés ${pending} ${pending===1?"tarea":"tareas"} pendiente${pending===1?"":"s"}.` : mine.length ? "Hiciste todo lo de hoy. ¡Bien ahí!" : "Hoy no tenés nada agendado."}</div>
-    </div></div>
-    <div class="score">${KEYS.map(k => `<div class="p" style="background:${shade(prof(k).color, .55)}">${charSVG(prof(k))}<div><div class="n tnum">${k==="pau"?a:b}⭐</div><div class="small" style="font-weight:600">${esc(prof(k).name)} · esta semana</div></div></div>`).join("")}</div>
-    <div class="bal"><div class="bal-bar"><span style="width:${pa}%;background:${prof("pau").color}"></span><span style="width:${100-pa}%;background:${prof("fede").color}"></span></div><div class="bal-note">${balNote}</div>${rewardNudge()}</div>
-    ${moodCard()}
+    <div class="hello2"><button data-act="edit-prof" aria-label="Cambiar tu personaje">${charSVG(P, "char wiggle")}</button>
+      <div style="min-width:0"><div class="eyebrow">${DAYS[dow(t)]} ${fmtDay(t)}</div><h1>${greet}, ${esc(P.name)}</h1></div></div>
+    <button class="weekbar" data-act="go" data-v="premios" aria-label="Estrellitas de la semana">
+      <div class="row" style="justify-content:space-between"><span class="row" style="gap:6px">${charSVG(prof("pau"))}<b class="tnum">${a}⭐</b></span><span class="small muted">esta semana</span><span class="row" style="gap:6px"><b class="tnum">${b}⭐</b>${charSVG(prof("fede"))}</span></div>
+      <div class="bal-bar"><span style="width:${pa}%;background:${prof("pau").color}"></span><span style="width:${100 - pa}%;background:${prof("fede").color}"></span></div></button>
+    <div class="moodrow"><div class="moods mini">${MOODS.map(m => `<button class="mood-b ${play(m.lv) ? "play" : ""}" data-act="mood" data-v="${m.lv}" aria-pressed="${mineM === m.lv}">${moodSVG(prof(me), m.lv)}<span>${m.name}</span></button>`).join("")}</div>
+      <div class="mood-other">${om ? `<button class="mood-peek ${ui.moodPlay?.who === o && Date.now() < ui.moodPlay.until ? "play" : ""}" data-act="mood-peek" data-v="${om}" aria-label="Ver cómo viene ${esc(prof(o).name)}">${moodSVG(prof(o), om)}</button>${esc(prof(o).name)}: <b style="color:var(--ink)">${moodName(om).toLowerCase()}</b>` : `${charSVG({ ...prof(o), face:"dots" })}${esc(prof(o).name)} no contó cómo viene`}</div></div>
 
-    ${late.length ? `<section class="sec"><div class="sec-h"><h2>Quedaron pendientes</h2></div><div class="tasks">${late.map(x => taskCard(x, {showDay:true})).join("")}</div></section>` : ""}
-
-    <section class="sec"><div class="sec-h"><h2>Tus tareas de hoy</h2><button class="btn sm ghost" data-act="new-task" data-day="${t}">${ic("plus")}Agregar</button></div>
-      ${mine.length ? `<div class="tasks">${mine.map(x => taskCard(x)).join("")}</div>` : `<div class="empty">Nada para vos hoy.</div>`}
+    <section class="sec"><div class="sec-h"><h2>Hoy</h2><button class="btn sm ghost" data-act="new-task" data-day="${t}">${ic("plus")}Agregar</button></div>
+      ${list.length ? `<div class="tasks">${list.map(x => taskCard(x, { showDay: x.day < t })).join("")}</div>` : `<div class="empty">Nada para vos hoy.</div>`}
+      <button class="add-day" data-act="quick-done">+ Hice algo sin anotar</button>
+      ${theirs.length ? `<details class="theirs"><summary>${esc(prof(o).name)} ${theirsLeft ? `tiene ${theirsLeft} ${theirsLeft === 1 ? "tarea" : "tareas"} hoy` : "ya hizo todo lo de hoy"}</summary><div class="tasks" style="margin-top:8px">${theirs.map(x => taskCard(x)).join("")}</div></details>` : ""}
     </section>
-    ${rest.length ? `<section class="sec"><div class="sec-h"><h2>Lo que hace ${esc(prof(other(me)).name)} hoy</h2></div><div class="tasks">${rest.map(x => taskCard(x)).join("")}</div></section>` : ""}
   </div><div>
-    ${(() => { const dn = parse(t).getDate(), cur = t.slice(0,7), pm = (() => { const d = parse(t); d.setDate(1); d.setMonth(d.getMonth()-1); return ymd(d).slice(0,7); })(); const mm = dn <= 5 ? pm : cur; if (dn > 5) return "";
-      return `<section class="sec"><button class="month-banner" data-act="go-summary" data-v="${mm}">${stickerSVG("scallop", "#EF8BB3", charSVG({ char:"star", color:"#F6C445", face:"happy" }))}<div><div class="eyebrow">Resumen mensual</div><b>${dn <= 5 ? `Ya está el resumen de ${monthLabel(pm)}` : `Así viene su ${monthLabel(cur)}`}</b></div></button></section>`; })()}
-    ${nr ? `<section class="sec"><div class="next-rem" data-act="go" data-v="avisos" style="cursor:pointer">${charSVG({char:"dog",color:"#C08A5B",face:"happy"})}<div><div class="eyebrow">Próximo aviso · ${nr.off===0?"hoy":nr.off===1?"mañana":DAYS[(new Date().getDay()+6+nr.off)%7].toLowerCase()} ${esc(nr.r.time)} hs</div><div style="font-weight:600">${esc(nr.r.text)}</div></div></div></section>` : ""}
-    ${petHomeHTML()}
-    <section class="sec"><div class="sec-h"><h2>Hábitos de hoy</h2><button class="btn sm ghost" data-act="go" data-v="habitos">Ver semana</button></div>${habitChips()}</section>
-    <section class="sec"><div class="sec-h"><h2>Ideas para la semana</h2></div>
-      ${sug.length ? sug.map(s => `<div class="sugg">${charSVG(prof(s.who||me))}<div><p>${esc(s.text)}</p>${s.act ? `<button class="btn sm pri" data-act="apply" data-v='${esc(JSON.stringify(s.act))}'>${esc(s.label)}</button>` : ""}</div></div>`).join("") : `<div class="empty">Todo equilibrado.</div>`}
-      ${aiBlock()}
-    </section>
+    ${notes.length ? `<section class="sec"><div class="sec-h"><h2>Para tener en cuenta</h2></div><div class="card" style="padding:4px 14px">${notes.slice(0, 4).join("")}</div></section>` : ""}
+    ${habits().length ? `<section class="sec"><div class="sec-h"><h2>Hábitos</h2><button class="btn sm ghost" data-act="go" data-v="habitos">Ver</button></div><div class="hscroll">${habitChips()}</div></section>` : ""}
   </div></div>`;
 }
-
 function aiBlock(){ return ""; }
 
 function viewWeek(){
