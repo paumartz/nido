@@ -436,6 +436,18 @@ button.stk{font:inherit;color:inherit}
 .lvbar i{display:block;height:100%;background:var(--violet);border-radius:999px}
 .lvtxt{font-size:11px;color:var(--ink-2)}
 .stk.locked .lvbar{opacity:.5}
+.actrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.actbtn{display:flex;align-items:center;justify-content:center;gap:6px;padding:12px;border-radius:16px;font-weight:700;font-size:15px;background:color-mix(in srgb,var(--c) 14%,var(--paper));color:var(--c);border:1.5px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.actbtn svg{width:18px;height:18px}
+.addgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.addopt{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px;border-radius:18px;text-align:left;background:color-mix(in srgb,var(--c) 12%,var(--paper));border:1.5px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.addopt .ai{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:var(--c);color:#fff}
+.addopt .ai svg{width:20px;height:20px}
+.addopt b{display:block;font-size:15.5px}
+.addopt small{display:block;font-size:12.5px;color:var(--ink-2)}
+details.more summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--violet);list-style:none}
+details.more summary::after{content:" ›";display:inline-block;transition:transform .15s}
+details.more[open] summary::after{transform:rotate(90deg)}
 @media (min-width:900px){.home-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:start}}
 </style>
 </head>
@@ -953,7 +965,7 @@ function viewHome(){
     ${notes.length ? `<div class="notes">${notes.slice(0, 3).join("")}</div>` : ""}
     <section class="sec"><h2>Hoy</h2>
       ${items ? `<div class="tasks">${late.map(x => taskCard(x, { showDay:true })).join("")}${mine.map(x => taskCard(x)).join("")}${myR.map(routineRow).join("")}</div>` : `<div class="empty">Nada para hoy 🎉</div>`}
-      <div class="row" style="gap:2px;flex-wrap:wrap"><button class="add-day" data-act="quick-done">+ Hice algo</button><button class="add-day" data-act="oops">− Macana</button></div>
+      <div class="actrow"><button class="actbtn" data-act="quick-done" style="--c:#3E9B5B">${ic("check", 2.6)}Hice algo</button><button class="actbtn" data-act="oops" style="--c:#F0644B">${ic("x", 2.6)}Macana</button></div>
     </section>
     <section class="sec">
       ${theirs.length ? `<details class="theirs"><summary>${charSVG(prof(o))}<span>${esc(prof(o).name)}${om ? ` · ${moodName(om).toLowerCase()}` : ""}</span><span class="muted">${theirsLeft ? `${theirsLeft} ${theirsLeft === 1 ? "pendiente" : "pendientes"}` : "todo hecho"}</span></summary><div class="tasks" style="margin-top:8px">${theirs.map(x => taskCard(x)).join("")}</div></details>`
@@ -1094,84 +1106,78 @@ function syncPressed(sheet, group, fn){ sheet.querySelectorAll(`[data-pick=${gro
 function whoPressed(as){ return v => v === "both" ? as.length === 2 : v === "none" ? as.length === 0 : as.length === 1 && as[0] === v; }
 
 function taskSheet(id, presetDay){
-  const t = id ? store.tasks[id] : { title:"", assignees:[me], day: presetDay ?? todayS(), time:"", points:1, repeat:"none", kind:"hogar" };
-  const draft = { assignees:[...(t.assignees||[])], day:t.day || "", points:t.points||1, kind:t.kind||"hogar", owner: id ? ownerOf(t.title) : null, cal: !!t.cal };
+  const t = id ? store.tasks[id] : { title:"", assignees:[me], day: presetDay ?? todayS(), time:"", points:2, repeat:"none", kind:"hogar" };
+  const o = other(me), tmd = todayS(), tom = addDays(tmd, 1);
+  const draft = { assignees:[...(t.assignees||[])], day:t.day || "", points:t.points || 2, kind:t.kind || "hogar", owner: id ? ownerOf(t.title) : null, cal: !!t.cal };
   let calTouched = !!id;
-  const tmd = todayS();
+  const when = !draft.day ? "cola" : draft.day === tmd ? "hoy" : draft.day === tom ? "manana" : "otro";
+  const chip = (g, v, label, on) => `<button type="button" class="chip" data-pick="${g}" data-v="${v}" aria-pressed="${on}">${label}</button>`;
   openSheet(`<form data-form="task" style="display:contents">
     <h2>${id ? "Editar tarea" : "Nueva tarea"}</h2>
-    ${id && t.status !== "done" ? `<div class="field"><span class="lbl">Mover rápido</span><div class="wrap-row">
-      <button type="button" class="btn sm" data-quick="${tmd}">Hoy</button><button type="button" class="btn sm" data-quick="${addDays(tmd,1)}">Mañana</button>
-      ${t.day ? `<button type="button" class="btn sm" data-quick="${addDays(t.day < tmd ? tmd : t.day, 1)}">Un día después</button><button type="button" class="btn sm" data-quick="${addDays(t.day,7)}">Una semana después</button>` : ""}
-      <button type="button" class="btn sm" data-quick="">A la cola</button></div></div>` : ""}
-    <div class="field"><span class="lbl">Tipo</span><div class="wrap-row">${Object.entries(KINDS).map(([k,v]) => `<button type="button" class="chip" data-pick="kind" data-v="${k}" aria-pressed="${draft.kind===k}">${v}</button>`).join("")}</div>
-      <span class="small muted" id="kindHint">${KIND_HINT[draft.kind]}</span></div>
-    ${!id ? `<div class="field"><label for="tPick">Elegí una frecuente…</label>${catalogSelect("tPick")}</div>` : ""}
-    <div class="field"><label for="tTitle">${id ? "¿Qué hay que hacer?" : "…o escribila"}</label><input class="inp" id="tTitle" required maxlength="80" value="${esc(t.title)}" placeholder="${draft.kind==="gestion"?"Pedir turno al veterinario":"Lavar las sábanas"}">
-      ${!id ? `
-      <div class="wrap-row" style="align-items:center"><span class="small muted">O en pasos:</span>${BATCHES.map((b, i) => `<button type="button" class="chip" data-batch="${i}">${esc(b[0])} · ${b[1].length} pasos</button>`).join("")}<button type="button" class="chip" data-batch="new">+ Armar tanda</button></div>` : ""}</div>
-    <div class="field"><span class="lbl">¿Quién la hace?</span><div class="wrap-row">
-      ${KEYS.map(k => `<button type="button" class="chip" data-pick="who" data-v="${k}" aria-pressed="${whoPressed(draft.assignees)(k)}">${charSVG(prof(k))}${esc(prof(k).name)}</button>`).join("")}
-      <button type="button" class="chip" data-pick="who" data-v="both" aria-pressed="${draft.assignees.length===2}">Los dos</button>
-      <button type="button" class="chip" data-pick="who" data-v="none" aria-pressed="${draft.assignees.length===0}">Después vemos</button></div></div>
-    <div class="field"><span class="lbl">¿Cuándo?</span><div class="wrap-row">${dayChoices(draft.day)}</div><span class="hint" id="dayHint"></span></div>
-    <div class="field"><label for="tTime">Horario (opcional)</label><input class="inp" type="time" id="tTime" value="${esc(t.time||"")}" style="max-width:160px"></div>
-    <div class="field"><span class="lbl">¿Cuánto esfuerzo?</span><div class="wrap-row">
-      ${effortChips(draft.points)}</div></div>
-    <div class="field"><label for="tRepeat">Repetir</label><select class="inp" id="tRepeat">${Object.entries(REPEATS).map(([k,v]) => `<option value="${k}" ${(t.repeat||"none")===k?"selected":""}>${v}</option>`).join("")}</select></div>
-    <div class="field"><div class="row"><button type="button" class="switch" role="switch" id="tCal" aria-checked="${draft.cal}" aria-label="Mostrar en Google Calendar"></button><span><b>En Google Calendar</b></span></div></div>
-    <div class="field"><span class="lbl">Dueño de esta tarea</span><div class="wrap-row">
-      <button type="button" class="chip" data-pick="owner" data-v="" aria-pressed="${!draft.owner}">Nadie fijo</button>
-      ${KEYS.map(k => `<button type="button" class="chip" data-pick="owner" data-v="${k}" aria-pressed="${draft.owner===k}">${CROWN}${esc(prof(k).name)}</button>`).join("")}</div></div>
-    ${id && t.status === "done" ? `<div class="field"><span class="lbl">La hizo</span><div class="wrap-row">${KEYS.map(k => `<button type="button" class="chip" data-pick="doneby" data-v="${k}" aria-pressed="${(t.doneBy||[]).length===1&&t.doneBy[0]===k}">${esc(prof(k).name)}</button>`).join("")}<button type="button" class="chip" data-pick="doneby" data-v="both" aria-pressed="${(t.doneBy||[]).length===2}">Los dos</button></div></div>` : ""}
-    <div class="sheet-foot">
-      ${id ? `<button type="button" class="btn danger" data-del="${id}">Borrar</button>` : ""}
-      ${id && t.day ? `<a class="btn ghost" href="${gcalTaskUrl(t)}" target="_blank" rel="noopener">${ic("cal")}A Google Calendar</a>` : ""}
-      <span class="sp"></span>
-      <button type="button" class="btn ghost" data-act="close-sheet-btn">Cancelar</button>
-      <button type="submit" class="btn pri">${id ? "Guardar" : "Anotar"}</button>
-    </div></form>`, sheet => {
+    ${id && t.status !== "done" ? `<div class="wrap-row"><span class="small muted">Mover a:</span>
+      <button type="button" class="btn sm" data-quick="${tmd}">Hoy</button><button type="button" class="btn sm" data-quick="${tom}">Mañana</button>
+      ${t.day ? `<button type="button" class="btn sm" data-quick="${addDays(t.day,7)}">+1 semana</button>` : ""}<button type="button" class="btn sm" data-quick="">Más adelante</button></div>` : ""}
+    <input class="inp" id="tTitle" list="freqDL" required maxlength="80" value="${esc(t.title)}" placeholder="¿Qué hay que hacer?" autocomplete="off" style="font-size:17px;padding:14px 16px">
+    <datalist id="freqDL">${catalog().map(c => `<option value="${esc(c.title)}">`).join("")}</datalist>
+    <div class="field"><span class="lbl">¿Quién?</span><div class="wrap-row">
+      ${chip("who", me, `${charSVG(prof(me))}Yo`, draft.assignees.length === 1 && draft.assignees[0] === me)}
+      ${chip("who", o, `${charSVG(prof(o))}${esc(prof(o).name)}`, draft.assignees.length === 1 && draft.assignees[0] === o)}
+      ${chip("who", "both", "Los dos", draft.assignees.length === 2)}</div></div>
+    <div class="field"><span class="lbl">¿Cuándo?</span><div class="wrap-row">
+      ${chip("when", "hoy", "Hoy", when === "hoy")}${chip("when", "manana", "Mañana", when === "manana")}${chip("when", "otro", "Otro día", when === "otro")}${chip("when", "cola", "Más adelante", when === "cola")}</div>
+      <input class="inp" type="date" id="tDate" value="${when === "otro" ? esc(draft.day) : addDays(tmd, 2)}" min="${tmd}" style="max-width:200px" ${when === "otro" ? "" : "hidden"}>
+      <span class="hint" id="dayHint"></span></div>
+    <div class="field"><span class="lbl">Esfuerzo · <span id="effLbl" style="color:var(--ink)">${effortLabel(draft.points)}</span></span><div class="wrap-row">
+      ${EFFORT_OPTS.map(([p, l]) => `<button type="button" class="chip" data-pick="pts" data-v="${p}" aria-pressed="${draft.points === p}" aria-label="${l}"><span class="stars">${starStr(p)}</span></button>`).join("")}</div></div>
+    <details class="more"><summary>Más opciones</summary><div style="display:flex;flex-direction:column;gap:14px;margin-top:12px">
+      <div class="field"><span class="lbl">Tipo</span><div class="wrap-row">${Object.entries(KINDS).map(([k, v]) => chip("kind", k, v, draft.kind === k)).join("")}</div></div>
+      <div class="row" style="flex-wrap:wrap;gap:12px">
+        <div class="field"><label for="tTime">Horario</label><input class="inp" type="time" id="tTime" value="${esc(t.time || "")}" style="max-width:150px"></div>
+        <div class="field"><label for="tRepeat">Repetir</label><select class="inp" id="tRepeat">${Object.entries(REPEATS).map(([k, v]) => `<option value="${k}" ${(t.repeat || "none") === k ? "selected" : ""}>${v}</option>`).join("")}</select></div></div>
+      <div class="field"><span class="lbl">Dueño fijo</span><div class="wrap-row">${chip("owner", "", "Nadie", !draft.owner)}${KEYS.map(k => chip("owner", k, `${CROWN}${esc(prof(k).name)}`, draft.owner === k)).join("")}</div></div>
+      <div class="row"><button type="button" class="switch" role="switch" id="tCal" aria-checked="${draft.cal}" aria-label="En Google Calendar"></button><b>En Google Calendar</b></div>
+      ${id && t.status === "done" ? `<div class="field"><span class="lbl">La hizo</span><div class="wrap-row">${KEYS.map(k => chip("doneby", k, esc(prof(k).name), (t.doneBy||[]).length === 1 && t.doneBy[0] === k)).join("")}${chip("doneby", "both", "Los dos", (t.doneBy||[]).length === 2)}</div></div>` : ""}
+      ${!id ? `<div class="wrap-row"><span class="small muted">En pasos:</span>${BATCHES.map((b, i) => `<button type="button" class="chip" data-batch="${i}">${esc(b[0])}</button>`).join("")}<button type="button" class="chip" data-batch="new">+ Armar</button></div>` : ""}
+      ${id && t.day ? `<a class="btn sm ghost" style="align-self:flex-start" href="${gcalTaskUrl(t)}" target="_blank" rel="noopener">${ic("cal")}Abrir en Google Calendar</a>` : ""}
+    </div></details>
+    <div class="sheet-foot">${id ? `<button type="button" class="btn danger" data-del="${id}">Borrar</button>` : ""}<span class="sp"></span>
+      <button type="button" class="btn ghost" data-act="close-sheet-btn">Cancelar</button><button type="submit" class="btn pri">${id ? "Guardar" : "Anotar"}</button></div></form>`, sheet => {
     let doneBy = t.doneBy ? [...t.doneBy] : null;
+    const syncWho = () => syncPressed(sheet, "who", v => v === "both" ? draft.assignees.length === 2 : draft.assignees.length === 1 && draft.assignees[0] === v);
     const hints = () => {
       const d = draft.day, h = sheet.querySelector("#dayHint");
       if (!d){ h.textContent = ""; return; }
       const msgs = draft.assignees.map(k => { const w = whyBusy(k, d); if (w) return w; const n = loadOf(d, k) + (id && store.tasks[id]?.day === d ? -1 : 0); return n >= capacity(k, d) ? `${prof(k).name} ya tiene ${n} tareas ese día` : ""; }).filter(Boolean);
-      h.textContent = msgs.length ? msgs.join(" · ") + ". ¿Probás otro día?" : "";
+      h.textContent = msgs.length ? msgs.join(" · ") + "." : "";
     };
-    const applyOwner = () => {
-      const o = ownerOf($("#tTitle").value);
-      if (!o || id) return;
-      draft.owner = o; draft.assignees = [o];
-      syncPressed(sheet, "owner", v => v === o); syncPressed(sheet, "who", whoPressed(draft.assignees)); hints();
+    const applyCatalog = () => {
+      if (id) return;
+      const title = $("#tTitle").value, c = store.catalog[ckey(title)], ow = ownerOf(title);
+      if (c){ draft.points = c.points || 2; draft.kind = c.kind || "hogar"; syncPressed(sheet, "pts", v => +v === draft.points); syncPressed(sheet, "kind", v => v === draft.kind); $("#effLbl").textContent = effortLabel(draft.points); }
+      if (!calTouched){ draft.cal = !!c?.cal || BIG_RE.test(norm(title)); sheet.querySelector("#tCal").setAttribute("aria-checked", draft.cal); }
+      if (ow){ draft.owner = ow; draft.assignees = [ow]; syncWho(); syncPressed(sheet, "owner", v => v === ow); }
+      hints();
     };
-    const autoCal = () => { if (calTouched) return; draft.cal = BIG_RE.test(norm($("#tTitle").value)); sheet.querySelector("#tCal").setAttribute("aria-checked", draft.cal); };
     hints();
-    $("#tTitle").addEventListener("change", () => { applyOwner(); autoCal(); });
-    sheet.querySelector("#tPick")?.addEventListener("change", e => {
-      const c = store.catalog[e.target.value]; if (!c) return;
-      $("#tTitle").value = c.title; draft.points = c.points || 2; draft.kind = c.kind || "hogar";
-      syncPressed(sheet, "pts", v => +v === draft.points); syncPressed(sheet, "kind", v => v === draft.kind); sheet.querySelector("#kindHint").textContent = KIND_HINT[draft.kind];
-      if (!calTouched){ draft.cal = !!c.cal || BIG_RE.test(norm(c.title)); sheet.querySelector("#tCal").setAttribute("aria-checked", draft.cal); }
-      applyOwner();
-    });
+    $("#tTitle").addEventListener("change", applyCatalog);
+    $("#tDate").addEventListener("change", e => { draft.day = e.target.value; hints(); });
     sheet.addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
-      if (b.dataset.batch != null){ const pd = draft.day; closeSheet(); batchSheet(b.dataset.batch === "new" ? null : BATCHES[+b.dataset.batch], pd); return; }
       if (b.id === "tCal"){ calTouched = true; draft.cal = !draft.cal; b.setAttribute("aria-checked", draft.cal); return; }
-      if (b.dataset.tpl){ $("#tTitle").value = b.dataset.tpl; draft.points = +b.dataset.p; syncPressed(sheet, "pts", v => +v === draft.points); applyOwner(); autoCal(); return; }
+      if (b.dataset.batch != null){ const pd = draft.day; closeSheet(); batchSheet(b.dataset.batch === "new" ? null : BATCHES[+b.dataset.batch], pd); return; }
       if (b.dataset.pick){
         const g = b.dataset.pick, v = b.dataset.v;
         sheet.querySelectorAll(`[data-pick=${g}]`).forEach(x => x.setAttribute("aria-pressed", x === b));
-        if (g === "who") draft.assignees = v === "both" ? [...KEYS] : v === "none" ? [] : [v];
-        if (g === "day") draft.day = v;
-        if (g === "pts") draft.points = +v;
+        if (g === "who") draft.assignees = v === "both" ? [...KEYS] : [v];
+        if (g === "when"){ const di = sheet.querySelector("#tDate"); di.hidden = v !== "otro";
+          draft.day = v === "hoy" ? tmd : v === "manana" ? tom : v === "cola" ? "" : di.value; }
+        if (g === "pts"){ draft.points = +v; $("#effLbl").textContent = effortLabel(draft.points); }
+        if (g === "kind") draft.kind = v;
         if (g === "doneby") doneBy = v === "both" ? [...KEYS] : [v];
-        if (g === "kind"){ draft.kind = v; sheet.querySelector("#kindHint").textContent = KIND_HINT[v]; const row = sheet.querySelector("#tplRow"); if (row) row.innerHTML = tplChips(v); }
-        if (g === "owner"){ draft.owner = v || null; if (v && !id){ draft.assignees = [v]; syncPressed(sheet, "who", whoPressed(draft.assignees)); } }
-        hints();
-        return;
+        if (g === "owner"){ draft.owner = v || null; if (v && !id){ draft.assignees = [v]; syncWho(); } }
+        hints(); return;
       }
-      if ("quick" in b.dataset){ patch("tasks", id, { day: b.dataset.quick || null }); closeSheet(); toast(b.dataset.quick ? `Movida a ${dayLabel(b.dataset.quick).toLowerCase()}` : "Pasó a la cola"); return; }
+      if ("quick" in b.dataset){ patch("tasks", id, { day: b.dataset.quick || null }); closeSheet(); toast(b.dataset.quick ? `Movida a ${dayLabel(b.dataset.quick).toLowerCase()}` : "Pasó a más adelante"); return; }
       if (b.dataset.del){ del("tasks", b.dataset.del); closeSheet(); toast("Tarea borrada"); return; }
       if (b.dataset.act === "close-sheet-btn") closeSheet();
     });
@@ -1181,14 +1187,29 @@ function taskSheet(id, presetDay){
       const base = id ? store.tasks[id] : { status:"todo", createdAt:nowLocal(), createdBy:me };
       const data = { ...base, title, kind:draft.kind, assignees:draft.assignees, day:draft.day || null, time:$("#tTime").value || null, points:draft.points, repeat:$("#tRepeat").value, cal:draft.cal };
       if (id && t.status === "done" && doneBy) data.doneBy = doneBy;
-      if ((draft.owner || null) !== ownerOf(title)){
-        const ow = draft.owner;
-        updateHome(h => { const o = { ...(h.owners || {}) }; if (ow) o[okey(title)] = { title, who:ow }; else delete o[okey(title)]; return { ...h, owners:o }; });
-      }
+      if ((draft.owner || null) !== ownerOf(title)){ const ow = draft.owner; updateHome(h => { const ox = { ...(h.owners || {}) }; if (ow) ox[okey(title)] = { title, who:ow }; else delete ox[okey(title)]; return { ...h, owners:ox }; }); }
       put("tasks", id || uid8(), data);
       if (!id && !store.catalog[ckey(title)]) put("catalog", ckey(title), { title, kind:data.kind, points:data.points, cal:!!data.cal });
       closeSheet();
-      toast(id ? "Cambios guardados" : data.day ? `Anotada para ${dayLabel(data.day).toLowerCase()}` : "Anotada en la cola");
+      toast(id ? "Cambios guardados" : data.day ? `Anotada para ${dayLabel(data.day).toLowerCase()}` : "Anotada para más adelante");
+    });
+  });
+}
+
+function addMenu(){
+  const opt = (k, icon, title, sub, c) => `<button class="addopt" data-am="${k}" style="--c:${c}"><span class="ai">${ic(icon, 2.6)}</span><span><b>${title}</b><small>${sub}</small></span></button>`;
+  openSheet(`<h2>¿Qué querés anotar?</h2><div class="addgrid">
+    ${opt("task", "plus", "Una tarea", "para hacer", "#7A4FD3")}
+    ${opt("done", "check", "Hice algo", "que no estaba anotado", "#3E9B5B")}
+    ${opt("oops", "x", "Una macana", "resta estrellitas", "#F0644B")}
+    ${opt("super", "cart", "Algo del súper", "se está terminando", "#3BBDAE")}
+  </div>`, sheet => {
+    sheet.addEventListener("click", e => { const b = e.target.closest("[data-am]"); if (!b) return;
+      const k = b.dataset.am; closeSheet();
+      if (k === "task") taskSheet(null, ui.tab === "semana" ? undefined : undefined);
+      if (k === "done") quickDoneSheet();
+      if (k === "oops") oopsSheet();
+      if (k === "super"){ ui.tab = "super"; render(); window.scrollTo({ top:0 }); setTimeout(() => $("#shopInput")?.focus(), 100); }
     });
   });
 }
@@ -1323,29 +1344,27 @@ function awaySheet(){
 
 /* ============ sin anotar ============ */
 function quickDoneSheet(){
-  const d = { kind:"hogar", by:[me], points:1 };
-  openSheet(`<form style="display:contents"><h2>Hice algo que no estaba anotado</h2>
-    <div class="field"><span class="lbl">Tipo</span><div class="wrap-row">${Object.entries(KINDS).map(([k,v]) => `<button type="button" class="chip" data-pick="kind" data-v="${k}" aria-pressed="${k==="hogar"}">${v}</button>`).join("")}</div></div>
-    <div class="field"><label for="qTitle">¿Qué hiciste?</label><input class="inp" id="qTitle" required maxlength="80" placeholder="Desatascar la pileta"></div>
-    <div class="field"><label for="qPick">…o elegí una frecuente</label>${catalogSelect("qPick")}</div>
-    <div class="field"><span class="lbl">¿Quién lo hizo?</span><div class="wrap-row">${KEYS.map(k => `<button type="button" class="chip" data-pick="who" data-v="${k}" aria-pressed="${k===me}">${charSVG(prof(k))}${esc(prof(k).name)}</button>`).join("")}<button type="button" class="chip" data-pick="who" data-v="both" aria-pressed="false">Los dos</button></div></div>
-    <div class="field"><span class="lbl">¿Cuánto esfuerzo?</span><div class="wrap-row">${effortChips(1)}</div></div>
+  const o = other(me), d = { kind:"hogar", by:[me], points:1 };
+  const chip = (g, v, label, on) => `<button type="button" class="chip" data-pick="${g}" data-v="${v}" aria-pressed="${on}">${label}</button>`;
+  openSheet(`<form style="display:contents"><h2>Hice algo</h2>
+    <input class="inp" id="qTitle" list="freqDL2" required maxlength="80" placeholder="¿Qué hiciste?" autocomplete="off" style="font-size:17px;padding:14px 16px">
+    <datalist id="freqDL2">${catalog().map(c => `<option value="${esc(c.title)}">`).join("")}</datalist>
+    <div class="field"><span class="lbl">¿Quién?</span><div class="wrap-row">${chip("who", me, `${charSVG(prof(me))}Yo`, true)}${chip("who", o, `${charSVG(prof(o))}${esc(prof(o).name)}`, false)}${chip("who", "both", "Los dos", false)}</div></div>
+    <div class="field"><span class="lbl">Esfuerzo · <span id="qEff" style="color:var(--ink)">${effortLabel(1)}</span></span><div class="wrap-row">${EFFORT_OPTS.map(([p, l]) => `<button type="button" class="chip" data-pick="pts" data-v="${p}" aria-pressed="${p === 1}" aria-label="${l}"><span class="stars">${starStr(p)}</span></button>`).join("")}</div></div>
     <div class="sheet-foot"><span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Sumar estrellitas</button></div></form>`, sheet => {
+    $("#qTitle").addEventListener("change", () => { const c = store.catalog[ckey($("#qTitle").value)]; if (!c) return;
+      d.points = c.points || 1; d.kind = c.kind || "hogar"; syncPressed(sheet, "pts", v => +v === d.points); $("#qEff").textContent = effortLabel(d.points); });
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
-      if (b.dataset.tpl){ return; }
       if (b.dataset.pick){ const g = b.dataset.pick, v = b.dataset.v;
         sheet.querySelectorAll(`[data-pick=${g}]`).forEach(x => x.setAttribute("aria-pressed", x === b));
-        if (g === "kind") d.kind = v;
         if (g === "who") d.by = v === "both" ? [...KEYS] : [v];
-        if (g === "pts") d.points = +v; return; }
+        if (g === "pts"){ d.points = +v; $("#qEff").textContent = effortLabel(d.points); } return; }
       if (b.dataset.close) closeSheet(); });
-    sheet.querySelector("#qPick").addEventListener("change", e => { const c = store.catalog[e.target.value]; if (!c) return;
-      $("#qTitle").value = c.title; d.points = c.points || 2; d.kind = c.kind || "hogar"; syncPressed(sheet, "pts", v => +v === d.points); syncPressed(sheet, "kind", v => v === d.kind); });
     sheet.querySelector("form").addEventListener("submit", e => { e.preventDefault();
       const title = $("#qTitle").value.trim(); if (!title) return;
       put("tasks", uid8(), { title, kind:d.kind, assignees:d.by, day:todayS(), time:null, points:d.points, repeat:"none", status:"done", doneBy:d.by, doneAt:nowLocal(), spontaneous:true, createdAt:nowLocal(), createdBy:me });
       closeSheet(); burst(innerWidth/2, innerHeight/2);
-      toast(`+${fmtN(d.points)} ⭐ para ${d.by.map(k => prof(k).name).join(" y ")}. Quedó registrado.`); });
+      toast(`+${fmtN(d.points)} ⭐ para ${d.by.map(k => prof(k).name).join(" y ")}`); });
   });
 }
 
@@ -2671,7 +2690,7 @@ document.addEventListener("click", e => {
   switch (a){
     case "go": ui.tab = v; render(); window.scrollTo({ top:0 }); break;
     case "claim": claim(v); break;
-    case "new-task": if (ui.tab === "habitos" && el.id === "fab"){ habitSheet(); break; } taskSheet(null, el.dataset.day !== undefined ? el.dataset.day : undefined); break;
+    case "new-task": if (el.id === "fab"){ if (ui.tab === "habitos") habitSheet(); else addMenu(); break; } taskSheet(null, el.dataset.day !== undefined ? el.dataset.day : undefined); break;
     case "edit-task": taskSheet(v); break;
     case "toggle": { const r = el.getBoundingClientRect(); toggleTask(v, r.left + r.width/2, r.top + r.height/2); break; }
     case "apply": try { apply(JSON.parse(v)); } catch {} break;
