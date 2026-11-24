@@ -578,7 +578,7 @@ const DEFAULT_PROFILES = {
   fede:{ name:"Fede", char:"frog", color:"#7DB64A", face:"wink" },
 };
 const KEYS = ["pau","fede"];
-const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{}, routines:{}, shopmeta:{}, pets:{}, petcare:{}, petsupply:{}, petlog:{}, catalog:{}, rewards:{}, claims:{}, nudges:{} };
+const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{}, routines:{}, shopmeta:{}, pets:{}, petcare:{}, petsupply:{}, petlog:{}, catalog:{}, rewards:{}, claims:{}, nudges:{}, quicktokens:{} };
 const ui = { tab:"inicio", weekOf: weekStart(todayS()), loaded:false, slow:false, ai:null, aiBusy:false, aiErr:"", month:todayS().slice(0,7), letter:"", letterMonth:"", letterBusy:false, weekMode:(() => { try { return localStorage.getItem("nido-week-mode") || "quick"; } catch { return "quick"; } })(), habitView:"week", habitMonth:todayS().slice(0,7), habitYear:new Date().getFullYear(), daySheet:null };
 let DB = null, USER = null, SAMPLE = null, DL = null, DEMO = false, MY_UID = null, me = null, readOnly = false;
 
@@ -1025,6 +1025,7 @@ function viewHouse(){
   const ctx = homeCtx();
   return `<div class="row" style="margin-top:8px"><button class="icon-btn" data-act="go" data-v="nosotros" aria-label="Volver">${ic("left")}</button><h2 style="font-size:22px">La casa</h2></div>
   ${usExtra()}
+  ${quickSection()}
   <section class="sec"><div class="sec-h"><h2>Nuestro hogar</h2></div>
     <form class="card" data-form="ctx" style="display:flex;flex-direction:column;gap:12px">
       <div class="field"><label for="ctxPet">Nombre de la mascota</label><input class="inp" id="ctxPet" value="${esc(ctx.pet ?? "Vita")}" maxlength="40"></div>
@@ -2246,6 +2247,44 @@ function nextStepSheet(n, prev){
   });
 }
 
+/* ============ carga rápida (widgets) ============ */
+const QUICK_TYPES = [["super","Anotar en el súper","¿Qué falta?"],["tarea","Nueva tarea a la cola","¿Qué hay que hacer?"],["hice","Hice algo","¿Qué hiciste?"]];
+function quickSection(){
+  const tok = Object.values(store.quicktokens || {}).find(x => x.profile === me);
+  if (!tok) return `<section class="sec"><div class="sec-h"><h2>Carga rápida</h2></div><div class="card" style="display:flex;flex-direction:column;gap:10px"><span>Anotá desde un widget del celu, sin abrir Nido.</span><button class="btn pri" data-act="quick-on" style="align-self:flex-start" ${DEMO ? "disabled" : ""}>Activar</button></div></section>`;
+  const base = `${location.origin}/api/quick?k=${tok.id}&tipo=`;
+  return `<section class="sec"><div class="sec-h"><h2>Carga rápida</h2><button class="btn sm ghost danger" data-act="quick-off" data-v="${tok.id}">Anular</button></div>
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <div class="small muted">Copiá el link de cada uno. Es personal: no lo compartas.</div>
+      ${QUICK_TYPES.map(([k, l]) => `<div class="row"><b style="flex:1">${l}</b><button class="btn sm" data-act="copy-text" data-v="${esc(base + k + "&texto=")}">Copiar link</button></div>`).join("")}
+      <details><summary class="small" style="cursor:pointer;font-weight:600">Cómo armarlo en el iPhone</summary>
+        <ol class="small" style="margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:4px">
+          <li>Abrí <b>Atajos</b> y tocá <b>+</b>.</li>
+          <li>Agregá <b>Pedir entrada</b> (pregunta: “¿Qué falta?”).</li>
+          <li>Agregá <b>Codificar URL</b>.</li>
+          <li>Agregá <b>Obtener contenido de URL</b>: pegá el link y, al final, tocá y elegí <b>Texto codificado</b>.</li>
+          <li>Agregá <b>Mostrar notificación</b> con <b>Contenido de URL</b>.</li>
+          <li>Nombralo (“Súper”) y sumalo como widget: mantené apretado el inicio › <b>Editar › Agregar widget › Atajos</b>.</li>
+        </ol></details>
+      <details><summary class="small" style="cursor:pointer;font-weight:600">En Android</summary>
+        <p class="small" style="margin:8px 0 0">Mantené apretado el ícono de Nido: aparecen <b>Súper</b>, <b>Tarea</b> y <b>Hice algo</b>. Arrastrá el que quieras a la pantalla de inicio.</p></details>
+    </div></section>`;
+}
+function newQuickToken(){
+  const b = new Uint8Array(24); crypto.getRandomValues(b);
+  const tok = [...b].map(x => x.toString(16).padStart(2, "0")).join("");
+  put("quicktokens", tok, { profile:me, by:MY_UID, createdAt:nowLocal() });
+  toast("Carga rápida activada");
+}
+function handleQuickParam(){
+  const q = new URLSearchParams(location.search).get("quick");
+  if (!q || !me) return;
+  history.replaceState(null, "", location.pathname);
+  if (q === "super"){ ui.tab = "super"; render(); setTimeout(() => $("#shopInput")?.focus(), 150); }
+  else if (q === "tarea") taskSheet(null, "");
+  else if (q === "hice") quickDoneSheet();
+}
+
 /* ============ recordarle una tarea al otro ============ */
 const recentlyNudged = t => t.nudge && Date.now() - new Date(t.nudge.at).getTime() < 2 * 3600000;
 function nudgeSheet(id){
@@ -2596,6 +2635,8 @@ document.addEventListener("click", e => {
     case "go-summary": ui.tab = "resumen"; ui.month = v; render(); window.scrollTo({ top:0 }); break;
     case "month": { const [y, mo] = ui.month.split("-").map(Number); ui.month = ymd(new Date(y, mo - 1 + (+v), 1)).slice(0,7); render(); break; }
     case "letter": writeLetter(); break;
+    case "quick-on": newQuickToken(); break;
+    case "quick-off": del("quicktokens", v); toast("Clave anulada: los atajos viejos dejan de funcionar"); break;
     case "nudge": nudgeSheet(v); break;
     case "stars-week": starsSheet(v); break;
     case "album": ui.albumOf = v; render(); break;
@@ -2769,7 +2810,7 @@ function renderSetup(){
 async function boot(){
   const cfg = window.NIDO_CONFIG || {};
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-  if (!cfg.supabaseUrl || !window.supabase){ DEMO = true; seedDemo(); me = "pau"; ui.loaded = true; ui.pushState = "demo"; render(); setTimeout(checkSupplies, 800); setTimeout(ensureCatalog, 900); return; }
+  if (!cfg.supabaseUrl || !window.supabase){ DEMO = true; seedDemo(); me = "pau"; ui.loaded = true; ui.pushState = "demo"; render(); setTimeout(checkSupplies, 800); setTimeout(ensureCatalog, 900); handleQuickParam(); return; }
   SB = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth:{ persistSession:true, autoRefreshToken:true } });
   const { data:{ session } } = await SB.auth.getSession();
   if (!session){ renderLogin(); return; }
@@ -2794,6 +2835,7 @@ async function boot(){
   subscribeLive();
   setTimeout(checkSupplies, 1500); setInterval(checkSupplies, 3600000);
   setTimeout(ensureCatalog, 2000);
+  handleQuickParam();
   if (TZ && !homeCtx().tz) updateHome(h => h.tz ? h : ({ ...h, tz:TZ }));
   detectPush();
 }
