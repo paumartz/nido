@@ -26,7 +26,7 @@ export function buildIcs(rows, now = new Date()) {
       const nd = new Date(Date.UTC(+t.day.slice(0, 4), +t.day.slice(5, 7) - 1, +t.day.slice(8, 10) + 1));
       L.push(`DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${nd.toISOString().slice(0, 10).replace(/-/g, "")}`);
     }
-    L.push(fold("SUMMARY:" + icsEsc(title)), fold("DESCRIPTION:" + icsEsc(`Tarea de Nido · ${"★".repeat(t.points || 1)}`)), "TRANSP:TRANSPARENT", "END:VEVENT");
+    L.push(fold("SUMMARY:" + icsEsc(title)), fold("DESCRIPTION:" + icsEsc(`Tarea de Nido · ${"★".repeat(Math.floor(t.points || 1))}${(t.points || 1) % 1 ? "½" : ""}`)), "TRANSP:TRANSPARENT", "END:VEVENT");
   }
   L.push("END:VCALENDAR");
   return L.join("\r\n");
