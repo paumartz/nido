@@ -1,7 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 
-export const admin = () => createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+// Las claves nuevas de Supabase (sb_secret_…) van solo en el header "apikey".
+// Si además viajan como "Authorization: Bearer", Supabase rechaza el pedido.
+const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const keyFetch = (url, opts = {}) => {
+  const h = new Headers(opts.headers || {});
+  if (KEY.startsWith("sb_") && h.get("authorization") === `Bearer ${KEY}`) h.delete("authorization");
+  return fetch(url, { ...opts, headers: h });
+};
+export const admin = () => createClient(process.env.SUPABASE_URL, KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: keyFetch } });
 
 let ready = false;
 export function initPush() {
