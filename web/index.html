@@ -411,6 +411,10 @@ button.stk{font:inherit;color:inherit}
 .theirs[open] summary::before{transform:rotate(90deg)}
 .hscroll .wrap-row{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
 .hscroll .chip{white-space:nowrap;flex:none}
+.nudge-btn{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--ink-2);flex:none}
+.nudge-btn:hover{background:var(--soft)}
+.nudge-btn.sent{color:var(--teal)}
+.nudge-btn svg{width:18px;height:18px}
 @media (min-width:900px){.home-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:start}}
 </style>
 </head>
@@ -574,7 +578,7 @@ const DEFAULT_PROFILES = {
   fede:{ name:"Fede", char:"frog", color:"#7DB64A", face:"wink" },
 };
 const KEYS = ["pau","fede"];
-const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{}, routines:{}, shopmeta:{}, pets:{}, petcare:{}, petsupply:{}, petlog:{}, catalog:{}, rewards:{}, claims:{} };
+const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{}, routines:{}, shopmeta:{}, pets:{}, petcare:{}, petsupply:{}, petlog:{}, catalog:{}, rewards:{}, claims:{}, nudges:{} };
 const ui = { tab:"inicio", weekOf: weekStart(todayS()), loaded:false, slow:false, ai:null, aiBusy:false, aiErr:"", month:todayS().slice(0,7), letter:"", letterMonth:"", letterBusy:false, weekMode:(() => { try { return localStorage.getItem("nido-week-mode") || "quick"; } catch { return "quick"; } })(), habitView:"week", habitMonth:todayS().slice(0,7), habitYear:new Date().getFullYear(), daySheet:null };
 let DB = null, USER = null, SAMPLE = null, DL = null, DEMO = false, MY_UID = null, me = null, readOnly = false;
 
@@ -840,6 +844,7 @@ function render(){
   if (keep){ const el = document.getElementById(keep.id); if (el){ el.value = keep.v; el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch{} } }
   if (ui.daySheet){ const ds = document.querySelector("#layer .daysheet"); if (ds) ds.innerHTML = dayInner(ui.daySheet); else ui.daySheet = null; }
   checkThanks();
+  checkNudges();
 }
 
 function renderClaim(){
@@ -871,6 +876,7 @@ function taskCard(t, opts = {}){
   if (!as.length) meta.push(`<span>Sin asignar</span>`);
   if (t.status === "done" && t.doneBy?.length) meta.push(`<span>Hecha por ${t.doneBy.map(k => esc(prof(k).name)).join(" y ")}</span>`);
   if (late) meta.push(`<span class="pill late">Atrasada</span>`);
+  if (t.status !== "done" && recentlyNudged(t)) meta.push(`<span class="cal-on">${ic("bell")}${t.nudge.by === me ? "Recordada" : `Te la recordó ${esc(prof(t.nudge.by).name)}`}</span>`);
   let thx = "";
   if (t.status === "done" && me){
     const th = t.thanks || {}, by = t.doneBy || [];
@@ -883,6 +889,7 @@ function taskCard(t, opts = {}){
     <span class="who">${who.length ? who.map(k => charSVG(prof(k))).join("") : charSVG({char:"blob",color:"#D9D2E6",face:"sleepy"})}</span>
     <button class="body" data-act="edit-task" data-v="${t.id}"><span class="t">${esc(t.title)}</span><span class="m">${meta.join("")}</span></button>
     ${thx}
+    ${t.status !== "done" && me && (t.assignees || []).includes(other(me)) ? `<button class="nudge-btn ${recentlyNudged(t) && t.nudge.by === me ? "sent" : ""}" data-act="nudge" data-v="${t.id}" aria-label="Recordarle a ${esc(prof(other(me)).name)}">${ic("bell")}</button>` : ""}
     <button class="check" data-act="toggle" data-v="${t.id}" aria-label="${t.status==="done"?"Desmarcar":"Marcar como hecha"}">${ic("check", 3)}</button>
   </div>`;
 }
@@ -2239,6 +2246,54 @@ function nextStepSheet(n, prev){
   });
 }
 
+/* ============ recordarle una tarea al otro ============ */
+const recentlyNudged = t => t.nudge && Date.now() - new Date(t.nudge.at).getTime() < 2 * 3600000;
+function nudgeSheet(id){
+  const t = store.tasks[id]; if (!t) return;
+  const o = other(me), name = prof(o).name, pet = homeCtx().pet || "Vita";
+  if (recentlyNudged(t) && t.nudge.by === me){ toast(`Ya se la recordaste ${agoText(t.nudge.at)}`); return; }
+  const msgs = [`¿Te acordás de “${t.title}”? 🙏`, `Cuando puedas: ${t.title} 💜`, `Hoy sí o sí: ${t.title} 😅`];
+  if (/vita|basura/i.test(t.title)) msgs.unshift(`${pet} cuenta con vos: ${t.title} 🐶`);
+  openSheet(`<form style="display:contents"><h2>Recordarle a ${esc(name)}</h2>
+    <div class="wrap-row">${msgs.map((m, i) => `<button type="button" class="chip" data-m="${i}" aria-pressed="${i === 0}">${esc(m)}</button>`).join("")}</div>
+    <input class="inp" id="nMsg" maxlength="120" value="${esc(msgs[0])}" aria-label="Mensaje">
+    <div class="sheet-foot"><span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">${ic("bell")}Mandar</button></div></form>`, sheet => {
+    sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.m != null){ $("#nMsg").value = msgs[+b.dataset.m]; sheet.querySelectorAll("[data-m]").forEach(x => x.setAttribute("aria-pressed", x === b)); }
+      if (b.dataset.close) closeSheet(); });
+    sheet.querySelector("form").addEventListener("submit", e => { e.preventDefault();
+      const msg = $("#nMsg").value.trim() || msgs[0];
+      put("nudges", uid8(), { to:o, from:me, taskId:id, title:t.title, msg, at:nowLocal(), seen:false });
+      patch("tasks", id, { nudge:{ by:me, at:nowLocal() } });
+      notify([o], `${prof(me).name}: ${msg}`);
+      closeSheet(); toast(`Le recordamos a ${name}`); });
+  });
+}
+const shownNudges = new Set();
+function checkNudges(){
+  if (!me || $("#layer").innerHTML) return;
+  const all = Object.values(store.nudges || {});
+  const old = addDays(todayS(), -14);
+  all.filter(n => n.seen && n.at < old).slice(0, 5).forEach(n => del("nudges", n.id));
+  const n = all.filter(x => x.to === me && !x.seen && !shownNudges.has(x.id)).sort((a,b) => b.at.localeCompare(a.at))[0];
+  if (!n) return;
+  shownNudges.add(n.id);
+  const t = store.tasks[n.taskId], pending = t && t.status !== "done";
+  openSheet(`<div class="eyebrow" style="text-align:center">${esc(prof(n.from).name)} te recuerda</div>
+    ${stageHTML(n.from, "jump", n.msg)}
+    ${pending ? `<div class="tasks">${taskCard(t)}</div>` : `<p class="small muted" style="margin:0;text-align:center">${t ? "Esa tarea ya está hecha." : ""}</p>`}
+    <div class="sheet-foot" style="justify-content:center;flex-wrap:wrap">
+      ${pending ? `<button class="btn ghost" data-nx="tomorrow">Pasala a mañana</button><button class="btn" data-nx="ok">Ahora la hago</button><button class="btn pri" data-nx="done">¡Ya está hecha!</button>` : `<button class="btn pri" data-nx="ok">Ok</button>`}
+    </div>`, sheet => {
+    sheet.addEventListener("click", e => { const b = e.target.closest("[data-nx]"); if (!b) return;
+      const a = b.dataset.nx; closeSheet();
+      if (a === "done") completeTask(n.taskId, [me], innerWidth / 2, innerHeight / 2);
+      if (a === "tomorrow"){ patch("tasks", n.taskId, { day:addDays(todayS(), 1) }); notify([n.from], `${prof(me).name} pasó “${n.title}” para mañana`); toast("Pasada a mañana"); }
+    });
+  });
+  patch("nudges", n.id, { seen:true, seenAt:nowLocal() });
+}
+
 /* ============ de dónde salen las estrellitas ============ */
 function starsSheet(k){
   const t = todayS(), ws = weekStart(t), we = addDays(ws, 6);
@@ -2541,6 +2596,7 @@ document.addEventListener("click", e => {
     case "go-summary": ui.tab = "resumen"; ui.month = v; render(); window.scrollTo({ top:0 }); break;
     case "month": { const [y, mo] = ui.month.split("-").map(Number); ui.month = ymd(new Date(y, mo - 1 + (+v), 1)).slice(0,7); render(); break; }
     case "letter": writeLetter(); break;
+    case "nudge": nudgeSheet(v); break;
     case "stars-week": starsSheet(v); break;
     case "album": ui.albumOf = v; render(); break;
     case "stk": toast(v); break;
