@@ -27,8 +27,9 @@ export default async (req) => {
   if (!texto) return reply("No escribiste nada.", 400);
 
   const sb = admin();
-  const { data: tk } = await sb.from("docs").select("household_id,data").eq("col", "quicktokens").eq("id", token).maybeSingle();
-  if (!tk) return reply("Esa clave no existe o fue anulada. Generá una nueva en Nido › La casa.", 401);
+  const { data: tk, error: tkErr } = await sb.from("docs").select("household_id,data").eq("col", "quicktokens").eq("id", token).maybeSingle();
+  if (tkErr) return reply("El servidor no pudo leer la base: " + tkErr.message, 500);
+  if (!tk) return reply("Esa clave no existe o fue anulada. Generá una nueva en Nido › La casa. (Si recién la creaste, abrí /api/status para revisar la configuración.)", 401);
   const hh = tk.household_id, who = tk.data?.profile || "pau";
   const { data: rows } = await sb.from("docs").select("col,id,data").eq("household_id", hh).in("col", ["home", "shopping", "catalog"]);
   const tz = rows?.find(r => r.col === "home" && r.id === "main")?.data?.tz || "America/Argentina/Buenos_Aires";
