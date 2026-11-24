@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nido rápido</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Nido +">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F4F1FA">
+<link rel="apple-touch-icon" href="/apple-touch-icon-quick.png">
+<link rel="icon" href="/apple-touch-icon-quick.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600&family=Figtree:wght@400;600;700&display=swap">
+<style>
+:root{--bg:#F4F1FA;--paper:#fff;--ink:#2A2240;--ink-2:#6A6185;--line:#E4DEF0;--soft:#ECE7F6;--violet:#7A4FD3;--ok:#3E9B5B;--bad:#F0644B;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#18141F;--paper:#231D2E;--ink:#F1ECFA;--ink-2:#A79FBD;--line:#352D44;--soft:#2C2539;--violet:#A584F0;--ok:#6CC488;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 Figtree,system-ui,sans-serif}
+main{max-width:520px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px}
+h1{font:600 24px Fredoka,system-ui,sans-serif;margin:0;display:flex;align-items:center;gap:8px}
+h1 svg{width:34px;height:34px}
+.seg{display:flex;background:var(--soft);border-radius:14px;padding:4px;gap:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:11px;font:600 15px Figtree,sans-serif;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--paper);color:var(--ink);box-shadow:0 2px 8px -4px rgba(0,0,0,.3)}
+form{display:flex;flex-direction:column;gap:10px}
+input{width:100%;font:17px Figtree,sans-serif;padding:15px 16px;border-radius:16px;border:2px solid var(--line);background:var(--paper);color:var(--ink)}
+input:focus{outline:none;border-color:var(--violet)}
+button.go{border:0;border-radius:16px;padding:15px;font:700 17px Figtree,sans-serif;background:var(--violet);color:#fff}
+button.go:disabled{opacity:.6}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+li{background:var(--paper);border-radius:14px;padding:10px 14px;font-weight:600}
+li.bad{color:var(--bad)}
+a{color:var(--ink-2);font-size:14px;text-align:center}
+.msg{background:var(--paper);border-radius:16px;padding:16px;color:var(--ink-2)}
+</style>
+</head>
+<body>
+<main>
+  <h1><svg viewBox="0 0 100 100" aria-hidden="true"><g fill="#B58AE8"><circle cx="34" cy="56" r="20"/><circle cx="52" cy="40" r="22"/><circle cx="70" cy="56" r="19"/><rect x="18" y="56" width="68" height="26" rx="13"/></g><circle cx="44" cy="58" r="3.6" fill="#2A2240"/><circle cx="60" cy="58" r="3.6" fill="#2A2240"/><path d="M47 67 Q52 72 57 67" fill="none" stroke="#2A2240" stroke-width="2.4" stroke-linecap="round"/></svg>Anotar en Nido</h1>
+  <div id="app"></div>
+  <a href="/">Abrir Nido</a>
+</main>
+<script>
+const P = new URLSearchParams(location.search), key = P.get("k") || "";
+const TYPES = { super:["Súper","¿Qué falta? (yerba, leche…)"], tarea:["Tarea","¿Qué hay que hacer?"], hice:["Hice algo","¿Qué hiciste?"] };
+let tipo = P.get("tipo") || (() => { try { return localStorage.getItem("nido-rapido-tipo"); } catch { return null; } })() || "super";
+if (!TYPES[tipo]) tipo = "super";
+const app = document.getElementById("app");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+if (!/^[a-f0-9]{32,64}$/.test(key)){
+  app.innerHTML = `<div class="msg">Este anotador necesita tu link personal. Copialo en Nido › Nosotros › La casa › Carga rápida.</div>`;
+} else {
+  app.innerHTML = `<div class="seg">${Object.entries(TYPES).map(([k, [l]]) => `<button type="button" data-t="${k}" aria-pressed="${k === tipo}">${l}</button>`).join("")}</div>
+    <form id="f"><input id="t" autocomplete="off" enterkeyhint="send" placeholder="${esc(TYPES[tipo][1])}" autofocus><button class="go" id="b">Anotar</button></form><ul id="log"></ul>`;
+  const t = document.getElementById("t"), b = document.getElementById("b"), log = document.getElementById("log");
+  document.querySelector(".seg").addEventListener("click", e => {
+    const x = e.target.closest("[data-t]"); if (!x) return;
+    tipo = x.dataset.t; try { localStorage.setItem("nido-rapido-tipo", tipo); } catch {}
+    document.querySelectorAll("[data-t]").forEach(y => y.setAttribute("aria-pressed", y === x));
+    t.placeholder = TYPES[tipo][1]; t.focus();
+  });
+  document.getElementById("f").addEventListener("submit", async e => {
+    e.preventDefault(); const texto = t.value.trim(); if (!texto) return;
+    b.disabled = true; b.textContent = "Anotando…";
+    let ok = false, msg = "";
+    try { const r = await fetch(`/api/quick?k=${key}&tipo=${tipo}&texto=${encodeURIComponent(texto)}`); msg = await r.text(); ok = r.ok; }
+    catch { msg = "Sin conexión. Probá de nuevo."; }
+    log.insertAdjacentHTML("afterbegin", `<li class="${ok ? "" : "bad"}">${esc(msg)}</li>`);
+    if (ok) t.value = "";
+    b.disabled = false; b.textContent = "Anotar"; t.focus();
+  });
+}
+</script>
+</body>
+</html>
