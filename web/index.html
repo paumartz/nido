@@ -430,6 +430,12 @@ button.stk{font:inherit;color:inherit}
 .theirs summary svg,.theirs .sum svg{width:28px;height:28px}
 .theirs summary .muted,.theirs .sum .muted{margin-left:auto;font-weight:500;font-size:13px}
 .moodsheet .mood-b svg{width:56px;height:56px}
+.moodpill{display:inline-flex;align-items:baseline;gap:2px;margin-top:6px;padding:5px 12px;border-radius:999px;background:var(--soft);font-size:13.5px;text-align:left;flex-wrap:wrap}
+.hello2>button svg{width:64px;height:64px}
+.lvbar{display:block;width:70%;height:6px;border-radius:999px;background:var(--soft);overflow:hidden}
+.lvbar i{display:block;height:100%;background:var(--violet);border-radius:999px}
+.lvtxt{font-size:11px;color:var(--ink-2)}
+.stk.locked .lvbar{opacity:.5}
 @media (min-width:900px){.home-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:start}}
 </style>
 </head>
@@ -438,7 +444,7 @@ button.stk{font:inherit;color:inherit}
   <div class="brand" id="brand"></div>
   <span id="demoTag"></span><span id="sync"></span>
   <span class="sp"></span>
-  <button class="me-btn" id="meBtn" data-act="go" data-v="nosotros" hidden></button>
+  <button class="me-btn" id="meBtn" data-act="edit-prof" aria-label="Cambiar tu personaje" hidden></button>
 </div></header>
 <main class="wrap" id="view"><div class="empty" style="margin-top:40px">Abriendo el nido…</div></main>
 <button class="fab" id="fab" data-act="new-task" aria-label="Nueva tarea" hidden></button>
@@ -593,7 +599,7 @@ const DEFAULT_PROFILES = {
   fede:{ name:"Fede", char:"frog", color:"#7DB64A", face:"wink" },
 };
 const KEYS = ["pau","fede"];
-const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{}, routines:{}, shopmeta:{}, pets:{}, petcare:{}, petsupply:{}, petlog:{}, catalog:{}, rewards:{}, claims:{}, nudges:{}, quicktokens:{}, oops:{} };
+const store = { profiles:{}, tasks:{}, shopping:{}, reminders:{}, home:{}, away:{}, mood:{}, habits:{}, habitlog:{}, routines:{}, shopmeta:{}, pets:{}, petcare:{}, petsupply:{}, petlog:{}, catalog:{}, rewards:{}, claims:{}, nudges:{}, quicktokens:{}, oops:{}, rtskip:{} };
 const ui = { tab:"inicio", weekOf: weekStart(todayS()), loaded:false, slow:false, ai:null, aiBusy:false, aiErr:"", month:todayS().slice(0,7), letter:"", letterMonth:"", letterBusy:false, weekMode:(() => { try { return localStorage.getItem("nido-week-mode") || "quick"; } catch { return "quick"; } })(), habitView:"week", habitMonth:todayS().slice(0,7), habitYear:new Date().getFullYear(), daySheet:null };
 let DB = null, USER = null, SAMPLE = null, DL = null, DEMO = false, MY_UID = null, me = null, readOnly = false;
 
@@ -756,24 +762,29 @@ function stickersFor(k){
   const duo = Object.values(store.habitlog).filter(l => l.who === "both" && store.habits[l.habit]?.kind !== "treat").length;
   const hw = {}; Object.values(store.habitlog).filter(l => whoList(l.who).includes(k) && store.habits[l.habit]?.kind !== "treat").forEach(l => { const w = weekStart(l.date); hw[w] = (hw[w]||0) + 1; });
   const healthy = Object.values(hw).filter(n => n >= 5).length;
-  const P = prof(k);
-  const mk = (id, name, desc, got, frame, color, charP, count) => ({ id, name, desc, got, frame, color, charP, count });
+  const P = prof(k), petN = homeCtx().pet || "Vita";
+  const mk = (id, name, unit, value, steps, frame, color, charP) => {
+    const lv = steps.filter(x => value >= x).length, next = steps[lv], prev = lv ? steps[lv - 1] : 0;
+    const pct = next == null ? 100 : Math.max(0, Math.min(100, (value - prev) / (next - prev) * 100));
+    const desc = !lv ? `${name}: se desbloquea con ${steps[0]} ${unit}. Llevás ${fmtN(value)}.`
+      : next == null ? `${name}: ¡nivel máximo! ${fmtN(value)} ${unit}.`
+      : `${name} · nivel ${lv} de ${steps.length}. Llevás ${fmtN(value)} ${unit}; el próximo nivel es a los ${next}.`;
+    return { id, name, desc, got: lv > 0, lv, max: steps.length, pct, frame, color, charP };
+  };
   return [
-    mk("first","Primera estrellita","Completá tu primera tarea", done.length >= 1, "scallop", "#F6C445", { char:"star", color:"#F6C445", face:"happy" }),
-    mk("week","Semana redonda","Todas tus tareas de una semana hechas (mínimo 3)", perfect >= 1, "heart", "#F0644B", { char:"heart", color:"#EF8BB3", face:"dots" }, perfect),
-    mk("streak3","Racha de 3","3 días seguidos haciendo algo", best >= 3, "star", "#F59A4A", { char:"blob", color:"#F59A4A", face:"wink" }),
-    mk("streak7","Racha de 7","Una semana entera, día tras día", best >= 7, "checker", "#7F9BE0", { char:"cloud", color:"#8FC7E8", face:"sleepy" }),
-    mk("pet","Team " + (homeCtx().pet || "Vita"),"5 tareas de " + (homeCtx().pet || "Vita") + " o la basura", petTasks >= 5, "scallop", "#3BBDAE", { char:"dog", color:"#C08A5B", face:"happy" }),
-    mk("team","Equipazo","5 tareas hechas entre los dos", team >= 5, "heart", "#B58AE8", { char:"pentagon", color:"#7F9BE0", face:"dots" }),
-    mk("rescue","Salvavidas","Hiciste una tarea que le tocaba al otro", rescue >= 1, "square", "#7DB64A", { char:"frog", color:"#7DB64A", face:"wink" }, rescue),
-    mk("shop","Crack del súper","Compraste 10 cosas de la lista", shop >= 10, "star", "#EF8BB3", { char:"pig", color:"#F7B7C3", face:"dots" }),
-    mk("brain","Cerebro del hogar","5 tareas de gestión, esas que no se ven", gest >= 5, "heart", "#7F9BE0", { char:"cloud", color:"#B58AE8", face:"happy" }),
-    mk("ninja","Ninja del hogar","3 cosas hechas sin que estuvieran anotadas", spont >= 3, "square", "#5B4B8A", { char:"cat", color:"#5B5367", face:"wink" }),
-    mk("love","Corazón contento","Recibiste 5 gracias", thxIn >= 5, "scallop", "#EF8BB3", { char:"heart", color:"#F0644B", face:"happy" }),
-    mk("couch","Campeonato del sillón","5 compras del súper por app, sin moverte de casa", apps >= 5, "star", "#B58AE8", { char:"cat", color:"#2A2240", face:"sleepy" }, apps >= 5 ? Math.floor(apps/5) : 0),
-    mk("duo","Dúo dinámico","5 hábitos hechos juntos", duo >= 5, "heart", "#3BBDAE", { char:"frog", color:"#7DB64A", face:"happy" }),
-    mk("healthy","Semana sana","5 hábitos saludables en una semana", healthy >= 1, "scallop", "#7DB64A", { char:"flower", color:"#7DB64A", face:"wink" }, healthy),
-    mk("fifty","50 estrellas","Juntaste 50 estrellitas", pts >= 50, "checker", "#F6C445", { char:P.char, color:P.color, face:"happy" }),
+    mk("stars","Estrellitas","estrellitas", Math.max(0, lifetimeStars(k)), [1,50,150,400,1000], "scallop", "#F6C445", { char:"star", color:"#F6C445", face:"happy" }),
+    mk("streak","Racha","días seguidos", best, [3,7,14,30,60], "star", "#F59A4A", { char:"blob", color:"#F59A4A", face:"wink" }),
+    mk("week","Semana redonda","semanas con todo hecho", perfect, [1,4,12,26,52], "heart", "#F0644B", { char:"heart", color:"#EF8BB3", face:"dots" }),
+    mk("pet","Team " + petN,"tareas de " + petN + " o la basura", petTasks, [5,20,50,100,200], "scallop", "#3BBDAE", { char:"dog", color:"#C08A5B", face:"happy" }),
+    mk("team","Equipazo","tareas entre los dos", team, [5,20,50,100,200], "heart", "#B58AE8", { char:"pentagon", color:"#7F9BE0", face:"dots" }),
+    mk("rescue","Salvavidas","tareas que le tocaban al otro", rescue, [1,5,15,30,60], "square", "#7DB64A", { char:"frog", color:"#7DB64A", face:"wink" }),
+    mk("brain","Cerebro del hogar","tareas de gestión", gest, [5,20,50,100,200], "heart", "#7F9BE0", { char:"cloud", color:"#B58AE8", face:"happy" }),
+    mk("ninja","Ninja del hogar","cosas hechas sin anotar", spont, [3,10,25,50,100], "square", "#5B4B8A", { char:"cat", color:"#5B5367", face:"wink" }),
+    mk("love","Corazón contento","gracias recibidas", thxIn, [5,20,50,100,200], "scallop", "#EF8BB3", { char:"heart", color:"#F0644B", face:"happy" }),
+    mk("shop","Crack del súper","cosas compradas de la lista", shop, [10,50,150,400,1000], "star", "#EF8BB3", { char:"pig", color:"#F7B7C3", face:"dots" }),
+    mk("couch","Campeonato del sillón","compras por app", apps, [5,15,30,60,120], "star", "#B58AE8", { char:"cat", color:"#2A2240", face:"sleepy" }),
+    mk("duo","Dúo dinámico","hábitos hechos juntos", duo, [5,20,50,100,200], "heart", "#3BBDAE", { char:"frog", color:"#7DB64A", face:"happy" }),
+    mk("healthy","Semana sana","semanas con 5 hábitos o más", healthy, [1,4,12,26,52], "scallop", "#7DB64A", { char:"flower", color:"#7DB64A", face:"wink" }),
   ];
 }
 
@@ -929,14 +940,15 @@ function viewHome(){
   const rs = rewardsOf(me), bal = starBalance(me), can = rs.filter(r => r.cost <= bal).pop();
   if (can) notes.push(note(stickerSVG("star", "#F6C445", charSVG({ char:"heart", color:"#F0644B", face:"party" })), `Ya podés canjear <b>${esc(can.title)}</b>`, `data-act="go" data-v="premios"`));
 
-  const routineRow = r => { const on = !!store.tasks[rtId(r.id, t)];
-    return `<div class="task ${on ? "done" : ""}" style="--tc:var(--line)"><div class="body"><span class="t">${esc(r.title)}</span><span class="m"><span>Rutina</span><span class="stars">${starStr(r.points || 1)}</span></span></div><button class="check" data-act="routine-toggle" data-v="${r.id}" data-d="${t}" aria-label="${on ? "Desmarcar" : "Hecha"}">${ic("check", 3)}</button></div>`; };
+  const routineRow = r => { const on = !!store.tasks[rtId(r.id, t)], skip = !!store.rtskip?.[rtId(r.id, t)];
+    return `<div class="task ${on || skip ? "done" : ""}" style="--tc:var(--line)"><div class="body"><span class="t">${esc(r.title)}</span><span class="m"><span>Rutina · ${on ? `hecha, sumaste +${fmtN(r.points || 1)}⭐` : skip ? "hoy no la hiciste" : `si la hacés, +${fmtN(r.points || 1)}⭐`}</span></span></div>
+      ${on || skip ? `<button class="btn sm ghost" data-act="routine-undo" data-v="${r.id}" data-d="${t}">Deshacer</button>` : `<button class="nudge-btn" data-act="routine-skip" data-v="${r.id}" data-d="${t}" aria-label="Hoy no la hice">${ic("x", 2.4)}</button><button class="check" data-act="routine-toggle" data-v="${r.id}" data-d="${t}" aria-label="La hice">${ic("check", 3)}</button>`}</div>`; };
   const items = late.length + mine.length + myR.length;
 
   return `<div class="home1">
-    <div class="hello2"><button data-act="edit-prof" aria-label="Cambiar tu personaje">${charSVG(P, "char wiggle")}</button>
-      <div style="min-width:0;flex:1"><div class="eyebrow">${DAYS[dow(t)]} ${fmtDay(t)}</div><h1>${greet}, ${esc(P.name)}</h1></div>
-      <button class="moodbtn" data-act="mood-open" aria-label="Tu energía de hoy">${mineM ? moodSVG(P, mineM) : charSVG({ ...P, face:"dots" })}<span>${mineM ? moodName(mineM) : "¿Energía?"}</span></button></div>
+    <div class="hello2"><button data-act="mood-open" aria-label="Tu ánimo de hoy">${mineM ? moodSVG(P, mineM) : charSVG({ ...P, face:"dots" })}</button>
+      <div style="min-width:0;flex:1"><div class="eyebrow">${DAYS[dow(t)]} ${fmtDay(t)}</div><h1>${greet}, ${esc(P.name)}</h1>
+        <button class="moodpill" data-act="mood-open">${mineM ? `Hoy venís <b>${moodName(mineM).toLowerCase()}</b>` : "<b>¿Cómo venís hoy?</b>"}<span class="muted"> · ${esc(prof(o).name)}: ${om ? moodName(om).toLowerCase() : "sin contar"}</span> ›</button></div></div>
     <button class="starline" data-act="stars-week" data-v="${me}">Esta semana sumaste <b class="tnum">${fmtN(wk)}⭐</b><span class="muted"> · ${esc(prof(o).name)} ${fmtN(wo)}⭐</span><span class="muted" style="margin-left:auto">›</span></button>
     ${notes.length ? `<div class="notes">${notes.slice(0, 3).join("")}</div>` : ""}
     <section class="sec"><h2>Hoy</h2>
@@ -950,8 +962,10 @@ function viewHome(){
   </div>`;
 }
 function moodSheet(){
-  const m = moodOf(me, todayS());
-  openSheet(`<h2>¿Cómo venís hoy?</h2><div class="moods moodsheet">${MOODS.map(x => `<button class="mood-b" data-act="mood" data-v="${x.lv}" aria-pressed="${m === x.lv}">${moodSVG(prof(me), x.lv)}<span>${x.name}</span></button>`).join("")}</div>`);
+  const m = moodOf(me, todayS()), o = other(me), om = moodOf(o, todayS());
+  openSheet(`<h2>¿Cómo venís hoy?</h2>
+    <div class="mood-other">${om ? moodSVG(prof(o), om) : charSVG({ ...prof(o), face:"dots" })}<span>${esc(prof(o).name)}: <b style="color:var(--ink)">${om ? moodName(om).toLowerCase() : "todavía no contó"}</b></span></div>
+    <div class="moods moodsheet">${MOODS.map(x => `<button class="mood-b" data-act="mood" data-v="${x.lv}" aria-pressed="${m === x.lv}">${moodSVG(prof(me), x.lv)}<span>${x.name}</span></button>`).join("")}</div>`);
 }
 function aiBlock(){ return ""; }
 
@@ -1032,8 +1046,8 @@ function viewUs(){
       ${nav("casa", "#7F9BE0", stickerSVG("square", "#7F9BE0", charSVG({ char:"cloud", color:"#B58AE8", face:"dots" })), "La casa", "Oficina, dueños, rutina")}
     </div></section>${familySection()}
   <section class="sec"><div class="sec-h"><h2>Álbum</h2><div class="seg">${KEYS.map(k => `<button data-act="album" data-v="${k}" aria-pressed="${ak === k}">${esc(prof(k).name)}</button>`).join("")}</div></div>
-    <div class="album">${st.map(s => `<button class="stk ${s.got?"":"locked"}" data-act="stk" data-v="${esc(s.desc)}">${s.got && s.count > 1 ? `<span class="cnt">×${s.count}</span>` : ""}${stickerSVG(s.frame, s.color, charSVG(s.charP))}<b>${esc(s.name)}</b></button>`).join("")}</div>
-    <span class="small muted">${st.filter(s => s.got).length} de ${st.length} · tocá una para ver cómo se gana</span>
+    <div class="album">${st.map(s => `<button class="stk ${s.got?"":"locked"}" data-act="stk" data-v="${esc(s.desc)}">${s.lv ? `<span class="cnt">Nv ${s.lv}</span>` : ""}${stickerSVG(s.frame, s.color, charSVG(s.charP))}<b>${esc(s.name)}</b><span class="lvbar" aria-hidden="true"><i style="width:${s.pct}%"></i></span><small class="lvtxt">${s.lv >= s.max ? "Máximo" : `Nivel ${s.lv} de ${s.max}`}</small></button>`).join("")}</div>
+    <span class="small muted">Tocá un logro para ver cuánto falta para el próximo nivel</span>
   </section>`;
 }
 function viewHouse(){
@@ -1849,7 +1863,7 @@ function dayInner(d){
     <div class="field"><span class="lbl">Tareas</span>${list.length ? `<div class="tasks">${list.map(x => taskCard(x)).join("")}</div>` : `<div class="small muted">Nada fuera de lo de siempre.</div>`}
       <button class="add-day" data-act="new-task" data-day="${d}">+ Agregar tarea</button></div>
     ${rs.length ? `<div class="field"><span class="lbl">Rutinas</span><div class="card rlist" style="padding:4px 12px">${rs.map(r => { const on = !!store.tasks[rtId(r.id, d)];
-      return `<div class="list-row"><span class="who" style="display:flex">${(r.who||[]).map(k => charSVG(prof(k))).join("")}</span><div class="grow"><b>${esc(r.title)}</b><div class="small muted">${SLOTS[r.slot || ""]}</div></div><button class="rcheck" data-act="routine-toggle" data-v="${r.id}" data-d="${d}" aria-pressed="${on}" aria-label="${on ? "Desmarcar" : "Marcar hecha"}">${ic("check",3)}</button></div>`; }).join("")}</div></div>` : ""}`;
+      return `<div class="list-row"><span class="who" style="display:flex">${(r.who||[]).map(k => charSVG(prof(k))).join("")}</span><div class="grow"><b>${esc(r.title)}</b><div class="small muted">${SLOTS[r.slot || ""]} · ${on ? `+${fmtN(r.points || 1)}⭐` : store.rtskip?.[rtId(r.id, d)] ? "no se hizo" : `+${fmtN(r.points || 1)}⭐ si se hace`}</div></div><button class="rcheck" data-act="routine-toggle" data-v="${r.id}" data-d="${d}" aria-pressed="${on}" aria-label="${on ? "Desmarcar" : "Marcar hecha"}">${ic("check",3)}</button></div>`; }).join("")}</div></div>` : ""}`;
 }
 function openDay(d){
   ui.daySheet = d;
@@ -2693,6 +2707,8 @@ document.addEventListener("click", e => {
     case "go-summary": ui.tab = "resumen"; ui.month = v; render(); window.scrollTo({ top:0 }); break;
     case "month": { const [y, mo] = ui.month.split("-").map(Number); ui.month = ymd(new Date(y, mo - 1 + (+v), 1)).slice(0,7); render(); break; }
     case "letter": writeLetter(); break;
+    case "routine-skip": put("rtskip", rtId(v, el.dataset.d), { routine:v, day:el.dataset.d, who:me }); toast("Anotado: hoy no la hiciste. No resta."); break;
+    case "routine-undo": { const id = rtId(v, el.dataset.d); if (store.tasks[id]) del("tasks", id); if (store.rtskip?.[id]) del("rtskip", id); break; }
     case "oops": oopsSheet(); break;
     case "quick-on": newQuickToken(); break;
     case "quick-off": del("quicktokens", v); toast("Clave anulada: los atajos viejos dejan de funcionar"); break;
