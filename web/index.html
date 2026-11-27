@@ -463,6 +463,21 @@ details.more[open] summary::after{transform:rotate(90deg)}
 .qty{display:inline-flex;align-items:center;gap:4px;background:var(--soft);border-radius:14px;padding:3px}
 .qty button{width:36px;height:36px;border-radius:11px;font-size:20px;font-weight:700;background:var(--paper)}
 .qty b{min-width:34px;text-align:center;font-size:17px}
+.sheet{position:relative}
+.sheet-x{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--ink-2);z-index:2}
+.sheet-x svg{width:16px;height:16px}
+.sheet>h2:first-of-type{padding-right:40px}
+.toast{display:flex;align-items:center;gap:14px}
+.toast-act{font-weight:700;color:var(--sun);text-decoration:underline;text-underline-offset:3px}
+.slist{display:flex;flex-direction:column;gap:6px}
+.srow{display:flex;align-items:center;gap:10px;padding:8px 6px 8px 14px;border-radius:14px;background:color-mix(in srgb,var(--frog) 14%,var(--paper))}
+.srow.k-habit{background:color-mix(in srgb,var(--teal) 14%,var(--paper))}
+.srow.k-oops{background:color-mix(in srgb,var(--tomato) 12%,var(--paper))}
+.srow .sn{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srow em{font-style:normal;color:var(--ink-2);font-weight:700}
+.srow b{font-family:var(--f-display);font-size:17px}
+.sminus{width:30px;height:30px;border-radius:50%;font-size:18px;font-weight:700;color:var(--ink-2);flex:none}
+.sminus:hover{background:var(--paper)}
 @media (min-width:900px){.home-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:start}}
 </style>
 </head>
@@ -954,7 +969,8 @@ function viewHome(){
   const mine = tasksOn(t).filter(x => !x.routine && ((x.assignees || []).includes(me) || !(x.assignees || []).length));
   const late = tasks().filter(x => x.day && x.day < t && x.status !== "done" && ((x.assignees || []).includes(me) || !(x.assignees || []).length)).sort((x, y) => x.day.localeCompare(y.day));
   const myR = routinesOn(t).filter(r => (r.who || []).includes(me));
-  const theirs = tasksOn(t).filter(x => !x.routine && (x.assignees || []).includes(o) && !(x.assignees || []).includes(me));
+  const theirs = [...tasks().filter(x => x.day && x.day < t && x.status !== "done" && (x.assignees || []).includes(o) && !(x.assignees || []).includes(me)).sort((a, b) => a.day.localeCompare(b.day)),
+    ...tasksOn(t).filter(x => !x.routine && (x.assignees || []).includes(o) && !(x.assignees || []).includes(me))];
   const theirsLeft = theirs.filter(x => x.status !== "done").length;
   const hr = new Date().getHours(), greet = hr < 6 ? "Buenas noches" : hr < 13 ? "Buen día" : hr < 20 ? "Buenas tardes" : "Buenas noches";
   const mineM = moodOf(me, t), om = moodOf(o, t);
@@ -983,7 +999,7 @@ function viewHome(){
       <div class="actrow"><button class="actbtn" data-act="quick-done" style="--c:#3E9B5B">${ic("check", 2.6)}Hice algo</button><button class="actbtn" data-act="oops" style="--c:#F0644B">${ic("x", 2.6)}Macana</button></div>
     </section>
     <section class="sec">
-      ${theirs.length ? `<details class="theirs"><summary>${charSVG(prof(o))}<span>${esc(prof(o).name)}${om ? ` · ${moodName(om).toLowerCase()}` : ""}</span><span class="muted">${theirsLeft ? `${theirsLeft} ${theirsLeft === 1 ? "pendiente" : "pendientes"}` : "todo hecho"}</span></summary><div class="tasks" style="margin-top:8px">${theirs.map(x => taskCard(x)).join("")}</div></details>`
+      ${theirs.length ? `<details class="theirs"><summary>${charSVG(prof(o))}<span>${esc(prof(o).name)}${om ? ` · ${moodName(om).toLowerCase()}` : ""}</span><span class="muted">${theirsLeft ? `${theirsLeft} ${theirsLeft === 1 ? "pendiente" : "pendientes"}` : "todo hecho"}</span></summary><div class="tasks" style="margin-top:8px">${theirs.map(x => taskCard(x, { showDay: x.day < t })).join("")}</div></details>`
         : `<div class="theirs"><div class="sum">${charSVG(prof(o))}<span>${esc(prof(o).name)}${om ? ` · ${moodName(om).toLowerCase()}` : ""}</span><span class="muted">sin tareas hoy</span></div></div>`}
     </section>
   </div>`;
@@ -1096,8 +1112,8 @@ function viewHouse(){
 
 /* ============ sheets ============ */
 function openSheet(html, onMount){
-  $("#layer").innerHTML = `<div class="scrim" data-act="close-sheet"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
-  const first = $("#layer").querySelector("input,button:not([data-act=close-sheet])"); first?.focus({ preventScroll:true });
+  $("#layer").innerHTML = `<div class="scrim" data-act="close-sheet"><div class="sheet" role="dialog" aria-modal="true"><button class="sheet-x" data-act="close-sheet-x" aria-label="Cerrar">${ic("x", 2.4)}</button>${html}</div></div>`;
+  const first = $("#layer").querySelector("input:not([type=date]):not([readonly])"); first?.focus({ preventScroll:true });
   onMount?.($("#layer .sheet"));
 }
 const closeSheet = () => { $("#layer").innerHTML = ""; ui.daySheet = null; };
@@ -2450,47 +2466,40 @@ function checkOops(){
 
 /* ============ de dónde salen las estrellitas ============ */
 function starsSheet(k){
-  const t = todayS(), ws = weekStart(t), we = addDays(ws, 6);
+  const t = todayS(), ws = weekStart(t), we = addDays(ws, 6), sign = n => (n > 0 ? "+" : n < 0 ? "−" : "") + fmtN(Math.abs(n));
   const items = [
     ...tasks().filter(x => x.status === "done" && (x.doneBy || []).includes(k) && x.doneAt && x.doneAt.slice(0,10) >= ws && x.doneAt.slice(0,10) <= we)
-      .map(x => ({ d:x.doneAt.slice(0,10), t:x.title + (x.qty > 1 ? ` ×${x.qty}` : ""), p:x.points || 1, kind:"task", id:x.id })),
+      .map(x => ({ col:"tasks", doc:x, t:x.title, p:x.points || 1, n:x.qty || 1, kind:"task", at:x.doneAt })),
     ...Object.values(store.habitlog).filter(l => l.date >= ws && l.date <= we && whoList(l.who).includes(k) && store.habits[l.habit])
-      .map(l => ({ d:l.date, t:store.habits[l.habit].name, p:habitPts(store.habits[l.habit], l), kind:"habit", id:l.id })),
-    ...oopsOf(k, ws, we).map(x => ({ d:x.day, t:x.title, p:-(x.points || 1), kind:"oops", id:x.id })),
+      .map(l => ({ col:"habitlog", doc:l, t:store.habits[l.habit].name, p:habitPts(store.habits[l.habit], l), n:1, kind:"habit", at:l.date })),
+    ...oopsOf(k, ws, we).map(x => ({ col:"oops", doc:x, t:x.title, p:-(x.points || 1), n:1, kind:"oops", at:x.at || x.day })),
   ];
-  const sum = f => items.filter(f).reduce((s, i) => s + i.p, 0);
-  const tS = sum(i => i.kind === "task"), hS = sum(i => i.kind === "habit"), oS = sum(i => i.kind === "oops");
-  const days = {}; items.forEach(i => { (days[i.d] ||= []).push(i); });
-  const sign = n => (n > 0 ? "+" : n < 0 ? "−" : "") + fmtN(Math.abs(n));
-  openSheet(`<div class="row" style="justify-content:space-between;align-items:center">
+  const groups = {};
+  items.forEach(i => { const key = i.kind + "|" + ckey(i.t), g = groups[key] ||= { key, t:i.t, kind:i.kind, p:0, n:0, items:[] }; g.p += i.p; g.n += i.n; g.items.push(i); });
+  const list = Object.values(groups).filter(g => g.p !== 0).sort((a, b) => b.p - a.p);
+  const sum = kind => list.filter(g => g.kind === kind).reduce((s, g) => s + g.p, 0);
+  const tS = sum("task"), hS = sum("habit"), oS = sum("oops");
+  openSheet(`<div class="row" style="justify-content:space-between;align-items:center;padding-right:36px">
       <div class="seg">${KEYS.map(x => `<button data-sw="${x}" aria-pressed="${x === k}">${esc(prof(x).name)}</button>`).join("")}</div>
-      <span class="big tnum" style="font-size:32px">${fmtN(tS + hS + oS)}⭐</span></div>
+      <span class="big tnum" style="font-size:30px">${fmtN(tS + hS + oS)}⭐</span></div>
     <div class="stiles"><span class="st k-task"><b>${sign(tS)}</b>tareas</span><span class="st k-habit"><b>${sign(hS)}</b>hábitos</span>${oS ? `<span class="st k-oops"><b>${sign(oS)}</b>macanas</span>` : ""}</div>
-    ${!items.length ? `<div class="empty">Todavía nada esta semana.</div>` : Object.keys(days).sort().reverse().map(d => {
-      const list = days[d], tot = list.reduce((s, i) => s + i.p, 0);
-      return `<div class="sday"><div class="sdh"><b>${d === t ? "Hoy" : d === addDays(t, -1) ? "Ayer" : DAYS[dow(d)]}</b><span class="tnum">${sign(tot)}⭐</span></div>
-        <div class="schips">${list.map(i => `<button class="schip k-${i.kind}" data-si="${i.kind}:${i.id}">${esc(i.t)}<b>${sign(i.p)}</b></button>`).join("")}</div></div>`; }).join("")}
-    <p class="small muted" style="margin:0;text-align:center">Tocá una para quitarla si estaba repetida</p>`, sheet => {
+    ${list.length ? `<div class="slist">${list.map(g => `<div class="srow k-${g.kind}"><span class="sn">${esc(g.t)}${g.n > 1 ? ` <em>×${g.n}</em>` : ""}</span><b class="tnum">${sign(g.p)}</b><button class="sminus" data-rm="${esc(g.key)}" aria-label="Quitar una">−</button></div>`).join("")}</div>` : `<div class="empty">Todavía nada esta semana.</div>`}`, sheet => {
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.sw && b.dataset.sw !== k) starsSheet(b.dataset.sw);
-      if (b.dataset.si){ const [kind, id] = b.dataset.si.split(":"); starItemSheet(kind, id, k); } });
+      if (b.dataset.rm){ const g = groups[b.dataset.rm]; if (g) removeOne(g.items.sort((a, c) => String(c.at).localeCompare(String(a.at)))[0], k); }
+    });
   });
 }
-function starItemSheet(kind, id, k){
-  const x = kind === "task" ? store.tasks[id] : kind === "habit" ? store.habitlog[id] : store.oops[id]; if (!x) return;
-  const title = kind === "task" ? x.title + (x.qty > 1 ? ` ×${x.qty}` : "") : kind === "habit" ? store.habits[x.habit]?.name : x.title;
-  const plain = kind === "task" && !x.spontaneous && !x.routine;
-  openSheet(`<h2>${esc(title)}</h2>
-    <div class="sheet-foot" style="flex-direction:column;align-items:stretch">
-      ${plain ? `<button class="btn" data-x="undo">No la hice: volver a pendiente</button>` : ""}
-      <button class="btn danger" data-x="del">${kind === "oops" ? "Borrar la macana" : "Borrar (estaba repetida)"}</button>
-      <button class="btn ghost" data-x="back">Volver</button></div>`, sheet => {
-    sheet.addEventListener("click", e => { const b = e.target.closest("[data-x]"); if (!b) return;
-      if (b.dataset.x === "undo"){ const d = { ...x, status:"todo" }; delete d.doneBy; delete d.doneAt; delete d.thanks; put("tasks", id, d); toast("Volvió a pendiente"); }
-      if (b.dataset.x === "del"){ del(kind === "task" ? "tasks" : kind === "habit" ? "habitlog" : "oops", id); toast("Borrada"); }
-      starsSheet(k); });
-  });
+// Quita una (la más reciente) y deja deshacer
+function removeOne(i, k){
+  const before = clean(i.doc), id = i.doc.id;
+  if (i.col === "tasks" && (i.doc.qty || 1) > 1){ const unit = i.doc.unit || (i.doc.points / i.doc.qty); patch("tasks", id, { qty:i.doc.qty - 1, points:(i.doc.qty - 1) * unit }); }
+  else if (i.col === "tasks" && !i.doc.spontaneous && !i.doc.routine){ const d = { ...i.doc, status:"todo" }; delete d.doneBy; delete d.doneAt; delete d.thanks; put("tasks", id, d); }
+  else del(i.col, id);
+  starsSheet(k);
+  toast("Quitada", { label:"Deshacer", fn: () => { put(i.col, id, before); if ($("#layer .stiles")) starsSheet(k); } });
 }
+
 
 
 /* ============ todas las tareas ============ */
@@ -2677,7 +2686,7 @@ function completeTask(id, by, x, y){
 function toggleTask(id, x, y){
   const t = store.tasks[id]; if (!t) return;
   if (t.status === "done"){ const d = { ...t, status:"todo" }; delete d.doneBy; delete d.doneAt; delete d.thanks; put("tasks", id, d); return; }
-  completeTask(id, [me], x, y); // quien la marca, la suma (se cambia en "Más opciones" si hace falta)
+  completeTask(id, (t.assignees || []).length ? [...t.assignees] : [me], x, y); // la suma a quien le tocaba
 }
 function burst(x, y){
   if (x == null) return;
@@ -2688,10 +2697,12 @@ function burst(x, y){
   document.body.appendChild(b); setTimeout(() => b.remove(), 900);
 }
 let toastT;
-function toast(msg){
+function toast(msg, action){
   document.querySelector(".toast")?.remove(); clearTimeout(toastT);
-  const el = document.createElement("div"); el.className = "toast"; el.textContent = msg; el.setAttribute("role","status");
-  document.body.appendChild(el); toastT = setTimeout(() => el.remove(), 3200);
+  const el = document.createElement("div"); el.className = "toast"; el.setAttribute("role","status");
+  el.textContent = msg;
+  if (action){ const b = document.createElement("button"); b.className = "toast-act"; b.textContent = action.label; b.onclick = () => { el.remove(); action.fn(); }; el.appendChild(b); }
+  document.body.appendChild(el); toastT = setTimeout(() => el.remove(), action ? 5000 : 3200);
 }
 function apply(act){
   if (!act) return;
@@ -2740,6 +2751,7 @@ document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]"); if (!el) return;
   const a = el.dataset.act, v = el.dataset.v;
   if (a === "close-sheet"){ if (e.target === el) closeSheet(); return; }
+  if (a === "close-sheet-x"){ closeSheet(); return; }
   if (readOnly && !["go","close-sheet","wk","sync","month","go-summary","replay-thx","shop-copy","mood-peek","copy","logout","push-on","week-mode","day-open","habit-view","hnav","pet-open","copy-text","sync-retry","tf","tw","album","stk","stars-week"].includes(a) && me){ toast("Este nido está en modo lectura."); return; }
   switch (a){
     case "go": ui.tab = v; render(); window.scrollTo({ top:0 }); break;
