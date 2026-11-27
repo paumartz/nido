@@ -478,6 +478,10 @@ details.more[open] summary::after{transform:rotate(90deg)}
 .srow b{font-family:var(--f-display);font-size:17px}
 .sminus{width:30px;height:30px;border-radius:50%;font-size:18px;font-weight:700;color:var(--ink-2);flex:none}
 .sminus:hover{background:var(--paper)}
+.check.auto{background:var(--sun);border-color:var(--sun);cursor:default}
+.check.auto svg{opacity:1}
+.task.skipped .t{text-decoration:line-through;color:var(--ink-2)}
+.task.skipped{opacity:.75}
 @media (min-width:900px){.home-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:start}}
 </style>
 </head>
@@ -694,7 +698,24 @@ const EFFORT_OPTS = [[0.5,"Mini"],[1,"Easy peasy"],[2,"Tranqui"],[3,"Normal"],[4
 const effortLabel = p => (EFFORT_OPTS.find(o => o[0] === +p) || [0, ""])[1];
 const starStr = p => { p = +p || 1; const f = Math.floor(p); return f ? "★".repeat(f) + (p % 1 ? "½" : "") : "½★"; };
 const fmtN = n => { n = Math.round((+n || 0) * 10) / 10; return Number.isInteger(n) ? String(n) : n.toLocaleString("es-AR"); };
-const totalStars = (k, from, to) => pointsBy(k, from, to) + habitScore(from, to)[k] - oopsScore(k, from, to);
+const totalStars = (k, from, to) => pointsBy(k, from, to) + habitScore(from, to)[k] - oopsScore(k, from, to) + routineScore(k, from, to);
+// Las rutinas cuentan solas cada día que tocan (desde que se crearon), salvo que se marque "No la hice".
+function routineItems(k, from, to){
+  const t = todayS(), end = to < t ? to : t, out = [];
+  for (const r of Object.values(store.routines || {})){
+    if (!(r.who || []).includes(k)) continue;
+    const since = r.since || t;
+    for (let d = since > from ? since : from; d <= end; d = addDays(d, 1)){
+      if (!(r.days || []).includes(dow(d))) continue;
+      const id = rtId(r.id, d);
+      if (store.rtskip?.[id] || store.tasks[id]) continue; // salteada, o ya marcada a mano (versión anterior)
+      out.push({ r, d, id, p:r.points || 1 });
+    }
+  }
+  return out;
+}
+const routineScore = (k, from, to) => routineItems(k, from, to).reduce((s, i) => s + i.p, 0);
+function ensureRoutineSince(){ if (readOnly) return; Object.values(store.routines || {}).forEach(r => { if (!r.since) patch("routines", r.id, { since:todayS() }); }); }
 const effortChips = (sel, attr = 'data-pick="pts"') => EFFORT_OPTS.map(([p, l]) => `<button type="button" class="chip" ${attr} data-v="${p}" data-pts="${p}" aria-pressed="${sel===p}" title="${l}"><span class="stars">${starStr(p)}</span>${l}</button>`).join("");
 const REPEATS = { none:"No se repite", weekly:"Cada semana", biweekly:"Cada 2 semanas", monthly:"Cada mes" };
 
@@ -983,9 +1004,9 @@ function viewHome(){
   const rs = rewardsOf(me), bal = starBalance(me), can = rs.filter(r => r.cost <= bal).pop();
   if (can) notes.push(note(stickerSVG("star", "#F6C445", charSVG({ char:"heart", color:"#F0644B", face:"party" })), `Ya podés canjear <b>${esc(can.title)}</b>`, `data-act="go" data-v="premios"`));
 
-  const routineRow = r => { const on = !!store.tasks[rtId(r.id, t)], skip = !!store.rtskip?.[rtId(r.id, t)];
-    return `<div class="task ${on || skip ? "done" : ""}" style="--tc:var(--line)"><div class="body"><span class="t">${esc(r.title)}</span><span class="m"><span>Rutina · ${on ? `hecha, sumaste +${fmtN(r.points || 1)}⭐` : skip ? "hoy no la hiciste" : `si la hacés, +${fmtN(r.points || 1)}⭐`}</span></span></div>
-      ${on || skip ? `<button class="btn sm ghost" data-act="routine-undo" data-v="${r.id}" data-d="${t}">Deshacer</button>` : `<button class="nudge-btn" data-act="routine-skip" data-v="${r.id}" data-d="${t}" aria-label="Hoy no la hice">${ic("x", 2.4)}</button><button class="check" data-act="routine-toggle" data-v="${r.id}" data-d="${t}" aria-label="La hice">${ic("check", 3)}</button>`}</div>`; };
+  const routineRow = r => { const id = rtId(r.id, t), skip = !!store.rtskip?.[id];
+    return `<div class="task ${skip ? "skipped" : ""}" style="--tc:${skip ? "var(--line)" : "var(--frog)"}"><div class="body"><span class="t">${esc(r.title)}</span><span class="m"><span>${skip ? "Hoy no" : `Rutina · +${fmtN(r.points || 1)}⭐`}</span></span></div>
+      ${skip ? `<button class="btn sm ghost" data-act="routine-undo" data-v="${r.id}" data-d="${t}">Deshacer</button>` : `<button class="btn sm ghost" data-act="routine-skip" data-v="${r.id}" data-d="${t}">No la hice</button><span class="check auto" aria-label="Cuenta sola">${ic("check", 3)}</span>`}</div>`; };
   const items = late.length + mine.length + myR.length;
 
   return `<div class="home1">
@@ -1925,8 +1946,8 @@ function dayInner(d){
     ${dayTags(d)}
     <div class="field"><span class="lbl">Tareas</span>${list.length ? `<div class="tasks">${list.map(x => taskCard(x)).join("")}</div>` : `<div class="small muted">Nada fuera de lo de siempre.</div>`}
       <button class="add-day" data-act="new-task" data-day="${d}">+ Agregar tarea</button></div>
-    ${rs.length ? `<div class="field"><span class="lbl">Rutinas</span><div class="card rlist" style="padding:4px 12px">${rs.map(r => { const on = !!store.tasks[rtId(r.id, d)];
-      return `<div class="list-row"><span class="who" style="display:flex">${(r.who||[]).map(k => charSVG(prof(k))).join("")}</span><div class="grow"><b>${esc(r.title)}</b><div class="small muted">${SLOTS[r.slot || ""]} · ${on ? `+${fmtN(r.points || 1)}⭐` : store.rtskip?.[rtId(r.id, d)] ? "no se hizo" : `+${fmtN(r.points || 1)}⭐ si se hace`}</div></div><button class="rcheck" data-act="routine-toggle" data-v="${r.id}" data-d="${d}" aria-pressed="${on}" aria-label="${on ? "Desmarcar" : "Marcar hecha"}">${ic("check",3)}</button></div>`; }).join("")}</div></div>` : ""}`;
+    ${rs.length ? `<div class="field"><span class="lbl">Rutinas</span><div class="card rlist" style="padding:4px 12px">${rs.map(r => { const skip = !!store.rtskip?.[rtId(r.id, d)], fut = d > todayS();
+      return `<div class="list-row"><span class="who" style="display:flex">${(r.who||[]).map(k => charSVG(prof(k))).join("")}</span><div class="grow"><b>${esc(r.title)}</b><div class="small muted">${fut ? SLOTS[r.slot || ""] : skip ? "No se hizo" : `+${fmtN(r.points || 1)}⭐`}</div></div>${fut ? "" : `<button class="rcheck" data-act="routine-flip" data-v="${r.id}" data-d="${d}" aria-pressed="${!skip}" aria-label="${skip ? "Sí se hizo" : "No se hizo"}">${ic("check",3)}</button>`}</div>`; }).join("")}</div></div>` : ""}`;
 }
 function openDay(d){
   ui.daySheet = d;
@@ -1962,7 +1983,7 @@ function routineSheet(id){
     sheet.querySelector("form").addEventListener("submit", e => { e.preventDefault();
       const title = $("#rtTitle").value.trim(); if (!title) return;
       if (!d.who.length || !d.days.length){ toast("Elegí al menos una persona y un día."); return; }
-      put("routines", id || uid8(), { title, who:d.who, days:d.days, slot:d.slot, points:d.points });
+      put("routines", id || uid8(), { ...(id ? { since:store.routines[id]?.since || todayS() } : { since:todayS() }), title, who:d.who, days:d.days, slot:d.slot, points:d.points });
       closeSheet(); toast(id ? "Rutina actualizada" : "Rutina sumada"); });
   });
 }
@@ -2473,6 +2494,7 @@ function starsSheet(k){
     ...Object.values(store.habitlog).filter(l => l.date >= ws && l.date <= we && whoList(l.who).includes(k) && store.habits[l.habit])
       .map(l => ({ col:"habitlog", doc:l, t:store.habits[l.habit].name, p:habitPts(store.habits[l.habit], l), n:1, kind:"habit", at:l.date })),
     ...oopsOf(k, ws, we).map(x => ({ col:"oops", doc:x, t:x.title, p:-(x.points || 1), n:1, kind:"oops", at:x.at || x.day })),
+    ...routineItems(k, ws, we).map(i => ({ col:"routine", doc:{ id:i.id, routine:i.r.id, day:i.d }, t:i.r.title, p:i.p, n:1, kind:"task", at:i.d })),
   ];
   const groups = {};
   items.forEach(i => { const key = i.kind + "|" + ckey(i.t), g = groups[key] ||= { key, t:i.t, kind:i.kind, p:0, n:0, items:[] }; g.p += i.p; g.n += i.n; g.items.push(i); });
@@ -2492,6 +2514,8 @@ function starsSheet(k){
 }
 // Quita una (la más reciente) y deja deshacer
 function removeOne(i, k){
+  if (i.col === "routine"){ const sid = i.doc.id; put("rtskip", sid, { routine:i.doc.routine, day:i.doc.day, who:me }); starsSheet(k);
+    toast("Quitada", { label:"Deshacer", fn: () => { del("rtskip", sid); if ($("#layer .stiles")) starsSheet(k); } }); return; }
   const before = clean(i.doc), id = i.doc.id;
   if (i.col === "tasks" && (i.doc.qty || 1) > 1){ const unit = i.doc.unit || (i.doc.points / i.doc.qty); patch("tasks", id, { qty:i.doc.qty - 1, points:(i.doc.qty - 1) * unit }); }
   else if (i.col === "tasks" && !i.doc.spontaneous && !i.doc.routine){ const d = { ...i.doc, status:"todo" }; delete d.doneBy; delete d.doneAt; delete d.thanks; put("tasks", id, d); }
@@ -2792,7 +2816,8 @@ document.addEventListener("click", e => {
     case "go-summary": ui.tab = "resumen"; ui.month = v; render(); window.scrollTo({ top:0 }); break;
     case "month": { const [y, mo] = ui.month.split("-").map(Number); ui.month = ymd(new Date(y, mo - 1 + (+v), 1)).slice(0,7); render(); break; }
     case "letter": writeLetter(); break;
-    case "routine-skip": put("rtskip", rtId(v, el.dataset.d), { routine:v, day:el.dataset.d, who:me }); toast("Anotado: hoy no la hiciste. No resta."); break;
+    case "routine-skip": { const sid = rtId(v, el.dataset.d); put("rtskip", sid, { routine:v, day:el.dataset.d, who:me }); toast("Listo, hoy no suma", { label:"Deshacer", fn: () => del("rtskip", sid) }); break; }
+    case "routine-flip": { const sid = rtId(v, el.dataset.d); if (store.rtskip?.[sid]) del("rtskip", sid); else { put("rtskip", sid, { routine:v, day:el.dataset.d, who:me }); if (store.tasks[sid]) del("tasks", sid); } break; }
     case "routine-undo": { const id = rtId(v, el.dataset.d); if (store.tasks[id]) del("tasks", id); if (store.rtskip?.[id]) del("rtskip", id); break; }
     case "oops": oopsSheet(); break;
     case "quick-on": newQuickToken(); break;
@@ -2922,8 +2947,8 @@ function seedDemo(){
   store.pets.vita = { id:"vita", birth:"2023-03-10", vetName:"Veterinaria del barrio", vetPhone:"11 5555-1234" };
   [["2025-11-02",9.4],["2026-03-15",10.1],["2026-08-20",10.6],[addDays(t,-12),10.4]].forEach(([d,kg],i) => { store.petlog["w"+i] = { id:"w"+i, pet:"vita", type:"peso", date:d, kg }; });
   store.petlog.n1 = { id:"n1", pet:"vita", type:"nota", date:addDays(t,-12), title:"Visita a la vete", text:"Todo bien. Seguir con la misma comida.", by:"pau" };
-  store.routines.r1 = { id:"r1", title:"Sacar a Vita", who:["fede"], days:[0,1,2,3,4,5,6], slot:"manana", points:1 };
-  store.routines.r2 = { id:"r2", title:"Darles de comer a las gatas", who:["pau"], days:[0,1,2,3,4,5,6], slot:"noche", points:1 };
+  store.routines.r1 = { id:"r1", title:"Sacar a Vita", who:["fede"], days:[0,1,2,3,4,5,6], slot:"manana", points:1, since:ws };
+  store.routines.r2 = { id:"r2", title:"Darles de comer a las gatas", who:["pau"], days:[0,1,2,3,4,5,6], slot:"noche", points:1, since:ws };
   [["gym","Ir al gym","good","solo",3,2,2],["walk","Salir a caminar","good","together",2,2,2],["cine","Ir al cine","good","together",1,2,2],["cocina","Cocinamos en casa","good","together",0,2,1],["deli","Delivery o cheat meal","treat","together",3,2,1]]
     .forEach(([id,name,kind,mode,goal,budget,points],i) => { store.habits[id] = { id, name, kind, mode, goal: kind==="treat"?0:goal, budget, points, createdAt:"2026-01-0"+(i+1), ...(id === "deli" ? { vs:"cocina" } : {}) }; });
   const L = (h, d, w) => { const id = logKey(h, d, w); store.habitlog[id] = { id, habit:h, date:d, who:w, at:d+"T10:00:00" }; };
@@ -2994,7 +3019,7 @@ async function boot(){
   setInterval(() => { if (Object.keys(outbox).length && !saving) flushOutbox(); }, 30000);
   subscribeLive();
   setTimeout(checkSupplies, 1500); setInterval(checkSupplies, 3600000);
-  setTimeout(ensureCatalog, 2000);
+  setTimeout(ensureCatalog, 2000); setTimeout(ensureRoutineSince, 2500);
   handleQuickParam();
   if (TZ && !homeCtx().tz) updateHome(h => h.tz ? h : ({ ...h, tz:TZ }));
   detectPush();
