@@ -448,6 +448,21 @@ button.stk{font:inherit;color:inherit}
 details.more summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--violet);list-style:none}
 details.more summary::after{content:" ›";display:inline-block;transition:transform .15s}
 details.more[open] summary::after{transform:rotate(90deg)}
+.stiles{display:flex;gap:8px}
+.st{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px;border-radius:14px;font-size:12px;color:var(--ink-2);background:var(--soft)}
+.st b{font-family:var(--f-display);font-size:20px;font-weight:600;color:var(--ink)}
+.st.k-task{background:color-mix(in srgb,var(--frog) 18%,var(--paper))}.st.k-habit{background:color-mix(in srgb,var(--teal) 18%,var(--paper))}.st.k-oops{background:color-mix(in srgb,var(--tomato) 15%,var(--paper))}
+.sday{display:flex;flex-direction:column;gap:6px}
+.sdh{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-2)}
+.sdh b{color:var(--ink)}
+.schips{display:flex;flex-wrap:wrap;gap:6px}
+.schip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;max-width:100%;padding:6px 10px;border-radius:999px;font-size:13px;font-weight:600;background:color-mix(in srgb,var(--frog) 16%,var(--paper))}
+.schip b{font-variant-numeric:tabular-nums}
+.schip.k-habit{background:color-mix(in srgb,var(--teal) 16%,var(--paper))}
+.schip.k-oops{background:color-mix(in srgb,var(--tomato) 14%,var(--paper));color:var(--tomato)}
+.qty{display:inline-flex;align-items:center;gap:4px;background:var(--soft);border-radius:14px;padding:3px}
+.qty button{width:36px;height:36px;border-radius:11px;font-size:20px;font-weight:700;background:var(--paper)}
+.qty b{min-width:34px;text-align:center;font-size:17px}
 @media (min-width:900px){.home-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:start}}
 </style>
 </head>
@@ -926,7 +941,7 @@ function taskCard(t, opts = {}){
   }
   return `<div class="task ${t.status==="done"?"done":""}" style="--tc:${tc}" draggable="true" data-drag="${t.id}">
     <span class="who">${who.length ? who.map(k => charSVG(prof(k))).join("") : charSVG({char:"blob",color:"#D9D2E6",face:"sleepy"})}</span>
-    <button class="body" data-act="edit-task" data-v="${t.id}"><span class="t">${esc(t.title)}</span><span class="m">${meta.join("")}</span></button>
+    <button class="body" data-act="edit-task" data-v="${t.id}"><span class="t">${esc(t.title)}${t.qty > 1 ? ` ×${t.qty}` : ""}</span><span class="m">${meta.join("")}</span></button>
     ${thx}
     ${t.status !== "done" && me && (t.assignees || []).includes(other(me)) ? `<button class="nudge-btn ${recentlyNudged(t) && t.nudge.by === me ? "sent" : ""}" data-act="nudge" data-v="${t.id}" aria-label="Recordarle a ${esc(prof(other(me)).name)}">${ic("bell")}</button>` : ""}
     <button class="check" data-act="toggle" data-v="${t.id}" aria-label="${t.status==="done"?"Desmarcar":"Marcar como hecha"}">${ic("check", 3)}</button>
@@ -1136,6 +1151,7 @@ function taskSheet(id, presetDay){
         <div class="field"><label for="tRepeat">Repetir</label><select class="inp" id="tRepeat">${Object.entries(REPEATS).map(([k, v]) => `<option value="${k}" ${(t.repeat || "none") === k ? "selected" : ""}>${v}</option>`).join("")}</select></div></div>
       <div class="field"><span class="lbl">Dueño fijo</span><div class="wrap-row">${chip("owner", "", "Nadie", !draft.owner)}${KEYS.map(k => chip("owner", k, `${CROWN}${esc(prof(k).name)}`, draft.owner === k)).join("")}</div></div>
       <div class="row"><button type="button" class="switch" role="switch" id="tCal" aria-checked="${draft.cal}" aria-label="En Google Calendar"></button><b>En Google Calendar</b></div>
+      ${id && t.status === "done" ? `<div class="field"><label for="tDoneDay">Hecha el</label><input class="inp" type="date" id="tDoneDay" value="${esc((t.doneAt || "").slice(0,10))}" max="${tmd}" style="max-width:200px"></div>` : ""}
       ${id && t.status === "done" ? `<div class="field"><span class="lbl">La hizo</span><div class="wrap-row">${KEYS.map(k => chip("doneby", k, esc(prof(k).name), (t.doneBy||[]).length === 1 && t.doneBy[0] === k)).join("")}${chip("doneby", "both", "Los dos", (t.doneBy||[]).length === 2)}</div></div>` : ""}
       ${!id ? `<div class="wrap-row"><span class="small muted">En pasos:</span>${BATCHES.map((b, i) => `<button type="button" class="chip" data-batch="${i}">${esc(b[0])}</button>`).join("")}<button type="button" class="chip" data-batch="new">+ Armar</button></div>` : ""}
       ${id && t.day ? `<a class="btn sm ghost" style="align-self:flex-start" href="${gcalTaskUrl(t)}" target="_blank" rel="noopener">${ic("cal")}Abrir en Google Calendar</a>` : ""}
@@ -1184,9 +1200,12 @@ function taskSheet(id, presetDay){
     sheet.querySelector("form").addEventListener("submit", e => {
       e.preventDefault();
       const title = $("#tTitle").value.trim(); if (!title) return;
+      if (!id){ const dup = tasks().find(x => x.status !== "done" && ckey(x.title) === ckey(title) && (x.day || "") === (draft.day || "") && (x.assignees || []).join() === draft.assignees.join());
+        if (dup){ closeSheet(); toast("Ya estaba anotada"); return; } }
       const base = id ? store.tasks[id] : { status:"todo", createdAt:nowLocal(), createdBy:me };
       const data = { ...base, title, kind:draft.kind, assignees:draft.assignees, day:draft.day || null, time:$("#tTime").value || null, points:draft.points, repeat:$("#tRepeat").value, cal:draft.cal };
       if (id && t.status === "done" && doneBy) data.doneBy = doneBy;
+      if (id && t.status === "done"){ const dd = $("#tDoneDay")?.value; if (dd && dd !== (t.doneAt || "").slice(0,10)) data.doneAt = dd === tmd ? nowLocal() : dd + "T20:00:00"; }
       if ((draft.owner || null) !== ownerOf(title)){ const ow = draft.owner; updateHome(h => { const ox = { ...(h.owners || {}) }; if (ow) ox[okey(title)] = { title, who:ow }; else delete ox[okey(title)]; return { ...h, owners:ox }; }); }
       put("tasks", id || uid8(), data);
       if (!id && !store.catalog[ckey(title)]) put("catalog", ckey(title), { title, kind:data.kind, points:data.points, cal:!!data.cal });
@@ -1344,12 +1363,16 @@ function awaySheet(){
 
 /* ============ sin anotar ============ */
 function quickDoneSheet(){
-  const o = other(me), d = { kind:"hogar", by:[me], points:1 };
+  const o = other(me), tmd = todayS(), d = { kind:"hogar", by:[me], points:1, day:tmd, qty:1 };
   const chip = (g, v, label, on) => `<button type="button" class="chip" data-pick="${g}" data-v="${v}" aria-pressed="${on}">${label}</button>`;
   openSheet(`<form style="display:contents"><h2>Hice algo</h2>
     <input class="inp" id="qTitle" list="freqDL2" required maxlength="80" placeholder="¿Qué hiciste?" autocomplete="off" style="font-size:17px;padding:14px 16px">
     <datalist id="freqDL2">${catalog().map(c => `<option value="${esc(c.title)}">`).join("")}</datalist>
     <div class="field"><span class="lbl">¿Quién?</span><div class="wrap-row">${chip("who", me, `${charSVG(prof(me))}Yo`, true)}${chip("who", o, `${charSVG(prof(o))}${esc(prof(o).name)}`, false)}${chip("who", "both", "Los dos", false)}</div></div>
+    <div class="row" style="flex-wrap:wrap;gap:14px;align-items:flex-end">
+      <div class="field"><span class="lbl">¿Cuándo?</span><div class="wrap-row">${chip("when", "hoy", "Hoy", true)}${chip("when", "ayer", "Ayer", false)}${chip("when", "otro", "Otro día", false)}</div>
+        <input class="inp" type="date" id="qDate" value="${addDays(tmd, -2)}" max="${tmd}" style="max-width:200px" hidden></div>
+      <div class="field"><span class="lbl">¿Cuántas veces?</span><div class="qty"><button type="button" data-q="-1" aria-label="Menos">−</button><b id="qQty">1</b><button type="button" data-q="1" aria-label="Más">+</button></div></div></div>
     <div class="field"><span class="lbl">Esfuerzo · <span id="qEff" style="color:var(--ink)">${effortLabel(1)}</span></span><div class="wrap-row">${EFFORT_OPTS.map(([p, l]) => `<button type="button" class="chip" data-pick="pts" data-v="${p}" aria-pressed="${p === 1}" aria-label="${l}"><span class="stars">${starStr(p)}</span></button>`).join("")}</div></div>
     <div class="sheet-foot"><span class="sp"></span><button type="button" class="btn ghost" data-close="1">Cancelar</button><button class="btn pri" type="submit">Sumar estrellitas</button></div></form>`, sheet => {
     $("#qTitle").addEventListener("change", () => { const c = store.catalog[ckey($("#qTitle").value)]; if (!c) return;
@@ -1358,13 +1381,18 @@ function quickDoneSheet(){
       if (b.dataset.pick){ const g = b.dataset.pick, v = b.dataset.v;
         sheet.querySelectorAll(`[data-pick=${g}]`).forEach(x => x.setAttribute("aria-pressed", x === b));
         if (g === "who") d.by = v === "both" ? [...KEYS] : [v];
+        if (g === "when"){ const di = $("#qDate"); di.hidden = v !== "otro"; d.day = v === "hoy" ? tmd : v === "ayer" ? addDays(tmd, -1) : di.value; }
         if (g === "pts"){ d.points = +v; $("#qEff").textContent = effortLabel(d.points); } return; }
+      if (b.dataset.q){ d.qty = Math.max(1, Math.min(20, d.qty + +b.dataset.q)); $("#qQty").textContent = d.qty; return; }
       if (b.dataset.close) closeSheet(); });
+    $("#qDate").addEventListener("change", e => { d.day = e.target.value || tmd; });
     sheet.querySelector("form").addEventListener("submit", e => { e.preventDefault();
       const title = $("#qTitle").value.trim(); if (!title) return;
-      put("tasks", uid8(), { title, kind:d.kind, assignees:d.by, day:todayS(), time:null, points:d.points, repeat:"none", status:"done", doneBy:d.by, doneAt:nowLocal(), spontaneous:true, createdAt:nowLocal(), createdBy:me });
+      const total = d.points * d.qty;
+      put("tasks", uid8(), { title, kind:d.kind, assignees:d.by, day:d.day, time:null, points:total, unit:d.points, qty:d.qty, repeat:"none", status:"done", doneBy:d.by, doneAt: d.day === tmd ? nowLocal() : d.day + "T20:00:00", spontaneous:true, createdAt:nowLocal(), createdBy:me });
       closeSheet(); burst(innerWidth/2, innerHeight/2);
-      toast(`+${fmtN(d.points)} ⭐ para ${d.by.map(k => prof(k).name).join(" y ")}`); });
+      const wk = totalStars(me, weekStart(tmd), addDays(weekStart(tmd), 6));
+      toast(`+${fmtN(total)}⭐${d.by.includes(me) ? ` · llevás ${fmtN(wk)}⭐ esta semana` : ` para ${d.by.map(k => prof(k).name).join(" y ")}`}`); });
   });
 }
 
@@ -1444,7 +1472,7 @@ function monthStats(m){
   const per = {};
   for (const k of KEYS){
     const ds = done.filter(t => (t.doneBy||[]).includes(k));
-    const cnt = {}; ds.forEach(t => { cnt[t.title] = (cnt[t.title]||0) + 1; });
+    const cnt = {}; ds.forEach(t => { cnt[t.title] = (cnt[t.title]||0) + (t.qty || 1); });
     const moods = Object.values(store.mood).filter(x => x.who === k && x.date >= first && x.date <= last);
     per[k] = { n:ds.length, pts:ds.reduce((s,t) => s + (t.points||1), 0), hogar:ds.filter(t => t.kind !== "gestion").length, gest:ds.filter(t => t.kind === "gestion").length,
       spont:ds.filter(t => t.spontaneous).length, thxIn:ds.reduce((s,t) => s + Object.keys(t.thanks||{}).filter(f => f !== k).length, 0),
@@ -2423,22 +2451,47 @@ function checkOops(){
 /* ============ de dónde salen las estrellitas ============ */
 function starsSheet(k){
   const t = todayS(), ws = weekStart(t), we = addDays(ws, 6);
-  const tk = tasks().filter(x => x.status === "done" && (x.doneBy || []).includes(k) && x.doneAt && x.doneAt.slice(0,10) >= ws && x.doneAt.slice(0,10) <= we).sort((a,b) => b.doneAt.localeCompare(a.doneAt));
-  const hl = Object.values(store.habitlog).filter(l => l.date >= ws && l.date <= we && whoList(l.who).includes(k) && store.habits[l.habit]).sort((a,b) => b.date.localeCompare(a.date));
-  const tSum = tk.reduce((s, x) => s + (x.points || 1), 0), hSum = hl.reduce((s, l) => s + habitPts(store.habits[l.habit], l), 0);
-  const oo = oopsOf(k, ws, we).sort((a,b) => b.at.localeCompare(a.at)), oSum = oo.reduce((s, x) => s + (x.points || 1), 0);
-  const row = (d, title, extra, pts) => `<div class="list-row"><span class="pill tnum">${DAYS_S[dow(d)]}</span><div class="grow"><b>${esc(title)}</b>${extra ? `<span class="small muted"> · ${extra}</span>` : ""}</div><b class="tnum" style="color:${pts < 0 ? "var(--tomato)" : "var(--ink)"}">${pts > 0 ? "+" : ""}${fmtN(pts)}</b></div>`;
-  openSheet(`<div class="row" style="justify-content:space-between"><h2>${esc(prof(k).name)} · esta semana</h2><span class="big tnum" style="font-size:30px">${fmtN(tSum + hSum - oSum)}⭐</span></div>
-    <div class="seg">${KEYS.map(x => `<button data-sw="${x}" aria-pressed="${x === k}">${esc(prof(x).name)}</button>`).join("")}</div>
-    <div class="field"><span class="lbl">Tareas · ${fmtN(tSum)}⭐</span>${tk.length ? `<div class="card" style="padding:2px 14px">${tk.map(x => row(x.doneAt.slice(0,10), x.title, x.routine ? "rutina" : x.spontaneous ? "sin anotar" : (x.doneBy || []).length > 1 ? "entre los dos" : "", x.points || 1)).join("")}</div>` : `<div class="small muted">Ninguna todavía.</div>`}</div>
-    <div class="field"><span class="lbl">Hábitos · ${fmtN(hSum)}⭐</span>${hl.length ? `<div class="card" style="padding:2px 14px">${hl.map(l => row(l.date, store.habits[l.habit].name, l.who === "both" ? "juntos" : "", habitPts(store.habits[l.habit], l))).join("")}</div>` : `<div class="small muted">Ninguno todavía.</div>`}</div>
-    ${oo.length ? `<div class="field"><span class="lbl">Macanas · −${fmtN(oSum)}⭐</span><div class="card" style="padding:2px 14px">${oo.map(x => row(x.day, x.title, x.by !== k ? `la anotó ${esc(prof(x.by).name)}` : "", -(x.points || 1))).join("")}</div></div>` : ""}
-    <div class="sheet-foot"><button class="btn ghost" data-close="1">Listo</button></div>`, sheet => {
+  const items = [
+    ...tasks().filter(x => x.status === "done" && (x.doneBy || []).includes(k) && x.doneAt && x.doneAt.slice(0,10) >= ws && x.doneAt.slice(0,10) <= we)
+      .map(x => ({ d:x.doneAt.slice(0,10), t:x.title + (x.qty > 1 ? ` ×${x.qty}` : ""), p:x.points || 1, kind:"task", id:x.id })),
+    ...Object.values(store.habitlog).filter(l => l.date >= ws && l.date <= we && whoList(l.who).includes(k) && store.habits[l.habit])
+      .map(l => ({ d:l.date, t:store.habits[l.habit].name, p:habitPts(store.habits[l.habit], l), kind:"habit", id:l.id })),
+    ...oopsOf(k, ws, we).map(x => ({ d:x.day, t:x.title, p:-(x.points || 1), kind:"oops", id:x.id })),
+  ];
+  const sum = f => items.filter(f).reduce((s, i) => s + i.p, 0);
+  const tS = sum(i => i.kind === "task"), hS = sum(i => i.kind === "habit"), oS = sum(i => i.kind === "oops");
+  const days = {}; items.forEach(i => { (days[i.d] ||= []).push(i); });
+  const sign = n => (n > 0 ? "+" : n < 0 ? "−" : "") + fmtN(Math.abs(n));
+  openSheet(`<div class="row" style="justify-content:space-between;align-items:center">
+      <div class="seg">${KEYS.map(x => `<button data-sw="${x}" aria-pressed="${x === k}">${esc(prof(x).name)}</button>`).join("")}</div>
+      <span class="big tnum" style="font-size:32px">${fmtN(tS + hS + oS)}⭐</span></div>
+    <div class="stiles"><span class="st k-task"><b>${sign(tS)}</b>tareas</span><span class="st k-habit"><b>${sign(hS)}</b>hábitos</span>${oS ? `<span class="st k-oops"><b>${sign(oS)}</b>macanas</span>` : ""}</div>
+    ${!items.length ? `<div class="empty">Todavía nada esta semana.</div>` : Object.keys(days).sort().reverse().map(d => {
+      const list = days[d], tot = list.reduce((s, i) => s + i.p, 0);
+      return `<div class="sday"><div class="sdh"><b>${d === t ? "Hoy" : d === addDays(t, -1) ? "Ayer" : DAYS[dow(d)]}</b><span class="tnum">${sign(tot)}⭐</span></div>
+        <div class="schips">${list.map(i => `<button class="schip k-${i.kind}" data-si="${i.kind}:${i.id}">${esc(i.t)}<b>${sign(i.p)}</b></button>`).join("")}</div></div>`; }).join("")}
+    <p class="small muted" style="margin:0;text-align:center">Tocá una para quitarla si estaba repetida</p>`, sheet => {
     sheet.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.sw && b.dataset.sw !== k) starsSheet(b.dataset.sw);
-      if (b.dataset.close) closeSheet(); });
+      if (b.dataset.si){ const [kind, id] = b.dataset.si.split(":"); starItemSheet(kind, id, k); } });
   });
 }
+function starItemSheet(kind, id, k){
+  const x = kind === "task" ? store.tasks[id] : kind === "habit" ? store.habitlog[id] : store.oops[id]; if (!x) return;
+  const title = kind === "task" ? x.title + (x.qty > 1 ? ` ×${x.qty}` : "") : kind === "habit" ? store.habits[x.habit]?.name : x.title;
+  const plain = kind === "task" && !x.spontaneous && !x.routine;
+  openSheet(`<h2>${esc(title)}</h2>
+    <div class="sheet-foot" style="flex-direction:column;align-items:stretch">
+      ${plain ? `<button class="btn" data-x="undo">No la hice: volver a pendiente</button>` : ""}
+      <button class="btn danger" data-x="del">${kind === "oops" ? "Borrar la macana" : "Borrar (estaba repetida)"}</button>
+      <button class="btn ghost" data-x="back">Volver</button></div>`, sheet => {
+    sheet.addEventListener("click", e => { const b = e.target.closest("[data-x]"); if (!b) return;
+      if (b.dataset.x === "undo"){ const d = { ...x, status:"todo" }; delete d.doneBy; delete d.doneAt; delete d.thanks; put("tasks", id, d); toast("Volvió a pendiente"); }
+      if (b.dataset.x === "del"){ del(kind === "task" ? "tasks" : kind === "habit" ? "habitlog" : "oops", id); toast("Borrada"); }
+      starsSheet(k); });
+  });
+}
+
 
 /* ============ todas las tareas ============ */
 function freqList(q){
@@ -2604,26 +2657,27 @@ document.addEventListener("paste", e => {
 /* ============ actions ============ */
 function completeTask(id, by, x, y){
   const t = store.tasks[id]; if (!t) return;
-  const data = { ...t, status:"done", doneBy:by, doneAt:nowLocal() };
+  const today = todayS(), doneDay = t.day && t.day < today ? t.day : today; // atrasada: cuenta para su día
+  const data = { ...t, status:"done", doneBy:by, doneAt: doneDay === today ? nowLocal() : doneDay + "T20:00:00" };
   // recurring: spawn next one once
   if (t.repeat && t.repeat !== "none" && !t.spawned){
     const from = t.day || todayS();
     const next = t.repeat === "weekly" ? addDays(from, 7) : t.repeat === "biweekly" ? addDays(from, 14) : (() => { const d = parse(from); d.setMonth(d.getMonth()+1); return ymd(d); })();
     data.spawned = true;
+    const dupNext = tasks().some(x => x.id !== id && ckey(x.title) === ckey(t.title) && x.day === next);
     const n = clean(t); delete n.doneBy; delete n.doneAt; delete n.spawned; delete n.syncedSig; delete n.thanks; delete n.spontaneous;
-    put("tasks", uid8(), { ...n, status:"todo", day:next, createdAt:nowLocal() });
+    if (!dupNext) put("tasks", uid8(), { ...n, status:"todo", day:next, createdAt:nowLocal() });
   }
   put("tasks", id, data);
   burst(x, y);
-  toast(`+${fmtN(t.points||1)} ⭐ para ${by.map(k => prof(k).name).join(" y ")}`);
+  const wk = totalStars(me, weekStart(today), addDays(weekStart(today), 6));
+  toast(`+${fmtN(t.points||1)}⭐${by.includes(me) ? ` · llevás ${fmtN(wk)}⭐ esta semana` : ` para ${by.map(k => prof(k).name).join(" y ")}`}`);
   if (t.batch){ const nx = tasks().find(x => x.batch?.id === t.batch.id && x.batch.step === t.batch.step + 1 && x.status !== "done"); if (nx) setTimeout(() => nextStepSheet(nx, t), 600); }
 }
 function toggleTask(id, x, y){
   const t = store.tasks[id]; if (!t) return;
   if (t.status === "done"){ const d = { ...t, status:"todo" }; delete d.doneBy; delete d.doneAt; delete d.thanks; put("tasks", id, d); return; }
-  const as = t.assignees || [];
-  if (as.length === 1 && as[0] === me) return completeTask(id, [me], x, y);
-  whoDidSheet(id, x, y);
+  completeTask(id, [me], x, y); // quien la marca, la suma (se cambia en "Más opciones" si hace falta)
 }
 function burst(x, y){
   if (x == null) return;
